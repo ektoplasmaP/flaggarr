@@ -1,0 +1,69 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>flaggarr - first run</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%232f7a3f'/%3E%3Cpath d='M14 20c7-4 13 3 20-1s9-4 16-1v22c-7-3-9 3-16 1s-13-5-20-1z' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#f2f5f1;--fg:#182019;--mut:#66716a;--rule:#d5ddd6;--panel:#fff;--acc:#2f7a3f;--acc2:#52a862;--err:#b8402f;--code:#eef2ee}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#111713;--fg:#e6ece7;--mut:#8f9b93;--rule:#283329;--panel:#182119;--acc:#6fbf7f;--acc2:#4c9a5c;--err:#e0655a;--code:#0f150f}}
+:root[data-theme=dark]{--bg:#111713;--fg:#e6ece7;--mut:#8f9b93;--rule:#283329;--panel:#182119;--acc:#6fbf7f;--acc2:#4c9a5c;--err:#e0655a;--code:#0f150f}
+/* the same light/dark switch as app.html, top right; the choice is shared through localStorage */
+#themeBtn{position:absolute;top:15px;right:18px;width:48px;height:24px;margin:0;padding:0;border-radius:12px;border:1px solid var(--rule);background:var(--panel);cursor:pointer;display:flex;align-items:center;justify-content:space-between;color:var(--mut)}
+#themeBtn svg{position:relative;z-index:1;margin:0 5px;transition:color .2s}#themeBtn .sun{color:var(--fg)}#themeBtn.dark .sun{color:var(--mut)}#themeBtn.dark .moon{color:var(--fg)}
+#themeBtn i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--acc);opacity:.25;transition:transform .2s ease}#themeBtn.dark i{transform:translateX(24px)}#themeBtn:hover{border-color:var(--mut)}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif}
+form{background:var(--panel);border:1px solid var(--rule);border-radius:12px;padding:28px 28px 24px;width:min(360px,92vw);box-shadow:0 8px 30px rgba(0,0,0,.12)}
+.logo{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:700;font-size:1.3rem;margin-bottom:18px}.logo span{color:var(--acc2)}.logo svg{filter:drop-shadow(0 0 10px rgba(82,168,98,.6))}
+label{display:block;font-size:.85rem;color:var(--mut);margin-bottom:6px}
+input{font:inherit;width:100%;padding:9px 11px;border:1px solid var(--rule);border-radius:6px;background:var(--code);color:var(--fg)}
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus,input:-webkit-autofill:active{-webkit-text-fill-color:var(--fg);caret-color:var(--fg);-webkit-box-shadow:0 0 0 1000px var(--code) inset;box-shadow:0 0 0 1000px var(--code) inset;transition:background-color 100000s ease-in-out 0s}
+button{font:inherit;width:100%;margin-top:14px;padding:9px;border-radius:6px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer}
+.err{color:var(--err);font-size:.85rem;min-height:1.3em;margin-top:10px}
+.link{width:auto;margin:14px auto 0;display:block;background:none;border:0;color:var(--mut);font-size:.85rem;text-decoration:underline;padding:0;cursor:pointer}
+.link:hover{color:var(--acc)}
+#help{display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--rule);font-size:.85rem;color:var(--mut)}
+#help code{background:var(--code);border:1px solid var(--rule);border-radius:4px;padding:1px 5px;font-size:.9em}
+#help ol{margin:8px 0 0;padding-left:1.15em}
+#help li{margin-bottom:7px}
+.sect{color:var(--mut);font-weight:600;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;margin:0 0 10px}
+.or{display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--mut);font-size:.8rem;font-weight:600;letter-spacing:.05em}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--rule)}
+#adminFields{display:grid;grid-template-rows:0fr;opacity:0;visibility:hidden;transition:grid-template-rows .3s ease,opacity .25s ease,visibility .3s}
+#adminFields.open{grid-template-rows:1fr;opacity:1;visibility:visible}
+#adminFields .afin{overflow:hidden;min-height:0;padding:2px;margin:-2px}
+.err:empty{display:none}
+/* Template: password show/hide - the same .secret + [data-eye] as in app.html, 30 s auto-hide */
+.secret{position:relative;display:flex;align-items:center}
+.secret input{padding-right:32px;width:100%;box-sizing:border-box}
+.secret button{position:absolute;right:1px;top:1px;bottom:1px;display:flex;align-items:center;padding:0 8px;background:transparent;border:0;box-shadow:none;color:var(--mut);cursor:pointer;width:auto;margin:0}
+.secret button:hover{background:transparent;color:var(--fg)}
+.secret button svg{display:block}
+.secret button .ec{display:none}
+.secret button.on .ec{display:block}
+.secret button.on .eo{display:none}
+@media(max-width:640px){input,select{font-size:16px}}   /* iOS Safari zoom */
+</style></head><body>
+<form id="f"><div class="logo"><svg viewBox="0 0 64 64" width="34" height="34" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#52a862"/><stop offset="1" stop-color="#225c31"/></linearGradient></defs><circle cx="32" cy="32" r="30" fill="url(#g)"/><g transform="translate(64 0) scale(-1 1)"><path d="M14 20c7-4 13 3 20-1s9-4 16-1v22c-7-3-9 3-16 1s-13-5-20-1z" fill="#fff"/></g></svg><div><span>flagg</span>arr</div></div>
+<p class="sect">First run</p>
+<p style="color:var(--mut);font-size:.9rem;margin:0 0 16px">Pick a password to continue. You can change it later under Security.</p>
+<label for="p">Password</label><div class="secret"><input id="p" type="password" autocomplete="new-password" autofocus><button type="button" data-eye="p" title="Show"><svg class="eo" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="ec" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div>
+<label for="p2" style="margin-top:12px">Repeat</label><div class="secret"><input id="p2" type="password" autocomplete="new-password"><button type="button" data-eye="p2" title="Show"><svg class="eo" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="ec" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div>
+<button>Create and sign in</button>
+<div class="err" id="err"></div>
+</form>
+<script>
+try{const t=localStorage.getItem("flaggarr_theme");if(t)document.documentElement.dataset.theme=t}catch(e){}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-eye]");if(!b)return;
+  const i=document.getElementById(b.dataset.eye); b.classList.toggle("on"); i.type=i.type==="password"?"text":"password";
+  if(i.type==="text")setTimeout(()=>{i.type="password";b.classList.remove("on")},30000)});
+document.getElementById("f").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const err=document.getElementById("err");
+  const p=document.getElementById("p").value, p2=document.getElementById("p2").value;
+  err.textContent="";
+  if(p.length<8){err.textContent="At least 8 characters.";return}
+  if(p!==p2){err.textContent="The two passwords do not match.";return}
+  let r;
+  try{r=await (await fetch("/api/password",{method:"POST",headers:{"X-Requested-With":"flaggarr","Content-Type":"application/json"},
+      body:JSON.stringify({new:p})})).json()}catch(x){err.textContent="Could not reach flaggarr.";return}
+  if(r&&r.ok){location.href="/"}else{err.textContent=(r&&r.msg)||"Could not save."}
+});
+</script>
+</body></html>

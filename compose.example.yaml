@@ -1,0 +1,40 @@
+services:
+  flaggarr:
+    # The ready-made image, built from main by GitHub. Nothing to clone.
+    image: ghcr.io/ektoplasmap/flaggarr:latest
+    # To build from a clone of this repo instead, swap the line above for
+    # these two. No VERSION build arg here on purpose: a number pinned in this
+    # file would still claim the version you first downloaded long after you
+    # had updated. Builds from here label the image "dev"; to stamp the real
+    # number, build from the command line and let it read app/ui.py:
+    #   docker compose build --build-arg VERSION="$(sed -n 's/^VERSION *= *"\([^"]*\)".*/\1/p' app/ui.py)"
+    # build: .
+    # image: flaggarr:latest
+    container_name: flaggarr
+    restart: unless-stopped
+    ports:
+      - "8899:8899"
+    volumes:
+      # Settings, logs and backups. Created on first run - nothing to prepare.
+      - ./config:/config
+      # The media library must be on the SAME path inside and outside the
+      # container, so the paths Radarr and Sonarr send in the webhook work
+      # without translation.
+      - /volume1/PlexMedia:/volume1/PlexMedia
+    environment:
+      - TZ=Europe/Stockholm
+      # The account the program runs as. Use the same user your other *arr
+      # containers run as - one with read/write on the media library. /config
+      # is handed to that user on start.
+      #
+      # Left commented out, the program runs as root. That always has the rights
+      # it needs: more than it needs, but it never fails on permissions. A
+      # guessed wrong UID does fail, and confusingly, on both the library and
+      # /config - so find your own rather than trusting the numbers below.
+      # `id -u` and `id -g` over SSH, or Control Panel > User on a Synology.
+      #
+      # The values here are a shape, not an answer. 1000 is a Linux desktop
+      # convention and is usually wrong on a Synology: DSM numbers its own
+      # accounts from 1026 up, and the group is normally `users`, which is 100.
+      # - PUID=1026
+      # - PGID=100

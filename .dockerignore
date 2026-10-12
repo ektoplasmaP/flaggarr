@@ -1,0 +1,11 @@
+.git
+.gitignore
+README.md
+REFERENCE.md
+DEFAULTS.md
+compose.yaml
+compose.example.yaml
+*.bak-*
+config/
+tests/
+**/__pycache__/

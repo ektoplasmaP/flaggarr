@@ -1,0 +1,27 @@
+# The program is app/ - everything below is this installation's own state or
+# its own addresses, and is created on first run.
+config/
+compose.yaml
+compose.override.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Editors and OS
+.DS_Store
+@eaDir/
+*.swp
+*~
+
+# Local backups
+*.bak-*
+_delete/
+_to_delete/
+_session_temp/
+
+# Owner-only working files: backlog and local editor state.
+CLAUDE.md
+TODO.md
+.claude/
+tests/
