@@ -5,9 +5,9 @@
 @media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#111713;--fg:#e6ece7;--mut:#8f9b93;--rule:#283329;--panel:#182119;--acc:#6fbf7f;--acc2:#4c9a5c;--err:#e0655a;--code:#0f150f}}
 :root[data-theme=dark]{--bg:#111713;--fg:#e6ece7;--mut:#8f9b93;--rule:#283329;--panel:#182119;--acc:#6fbf7f;--acc2:#4c9a5c;--err:#e0655a;--code:#0f150f}
 /* the same light/dark switch as app.html, top right; the choice is shared through localStorage */
-#themeBtn{position:absolute;top:15px;right:18px;width:48px;height:24px;margin:0;padding:0;border-radius:12px;border:1px solid var(--rule);background:var(--panel);cursor:pointer;display:flex;align-items:center;justify-content:space-between;color:var(--mut)}
-#themeBtn svg{position:relative;z-index:1;margin:0 5px;transition:color .2s}#themeBtn .sun{color:var(--fg)}#themeBtn.dark .sun{color:var(--mut)}#themeBtn.dark .moon{color:var(--fg)}
-#themeBtn i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--acc);opacity:.25;transition:transform .2s ease}#themeBtn.dark i{transform:translateX(24px)}#themeBtn:hover{border-color:var(--mut)}
+#themeBtn{position:absolute;top:15px;right:18px;width:72px;height:24px;margin:0;padding:0;border-radius:12px;border:1px solid var(--rule);background:var(--panel);cursor:pointer;display:flex;align-items:center;justify-content:space-between;color:var(--mut)}
+#themeBtn svg{position:relative;z-index:1;margin:0 5px;transition:color .2s}#themeBtn.t-light .sun,#themeBtn.t-auto .auto,#themeBtn.t-dark .moon{color:var(--fg)}
+#themeBtn i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--acc);opacity:.25;transition:transform .2s ease}#themeBtn.t-auto i{transform:translateX(23px)}#themeBtn.t-dark i{transform:translateX(46px)}   /* three spots: light, auto (follows the system, light when it says nothing), dark */#themeBtn:hover{border-color:var(--mut)}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif}
 form{background:var(--panel);border:1px solid var(--rule);border-radius:12px;padding:28px 28px 24px;width:min(360px,92vw);box-shadow:0 8px 30px rgba(0,0,0,.12)}
 .logo{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:700;font-size:1.3rem;margin-bottom:18px}.logo span{color:var(--acc2)}.logo svg{filter:drop-shadow(0 0 10px rgba(82,168,98,.6))}
