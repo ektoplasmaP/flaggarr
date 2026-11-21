@@ -854,14 +854,14 @@ function ruleBox(title,pre){
  else if(mode!=='0')au.push('Your languages: '+order(langs));
  else{const map=w('audio_map').map(b=>b.split(':')), o=(map.find(p=>p[0]==='other')||[])[1]||ORIG;
   map.filter(p=>p[0]!=='other'&&p[1]!=='none').forEach(p=>au.push(L(p[0])+' original'+AR+'audio is '+L(p[1])));
-  au.push('Any other original language'+AR+esc((OTHER_MODES.find(m=>m[0]===o)||OTHER_MODES[0])[1])+(o==='list'?': '+order(langs):''))}
+  au.push('Any other original language'+AR+esc(({orig:'Prefer original audio',list:'Prefer dubbed audio'})[o]||(OTHER_MODES.find(m=>m[0]===o)||OTHER_MODES[0])[1])+(o==='list'?': '+order(langs):''))}
  const par=w('sub_rules').map(b=>b.split(':')), fol=par.some(p=>p[0]===FOLLOW), off=par.some(p=>p[0]===PLEX), nev=par.some(p=>p[0]===NEVER);
  if(off)su.push(skip);
  else if(nev)su.push('No subtitles at all');
  else{
   if(fol)su.push('No subtitles for: '+names(heardCodes('sub_rules')));
   else par.filter(p=>p[0]!==ORIG).forEach(p=>{const f=String(p[1]||'').endsWith('+forced'), t=String(p[1]||'').replace(/\+forced$/,'');
-    su.push(L(p[0])+' audio'+AR+(t==='none'?'None':L(t==='same'?p[0]:t)+(f?' (forced only)':'')))});
+    su.push(L(p[0])+' audio'+AR+(t==='none'?'No subtitles':L(t==='same'?p[0]:t)+' subtitles'+(f?' (forced only)':'')))});
   su.push('Subtitle language for foreign content: '+order(w('sub_langs')))}
  // Subtitle types and codec rules, as the Tracks page and the fine-tune guide set them (shared with the tag set, so only in the main summary)
  const TN={sdh:'SDH',forced:'Forced',pgs:'PGS',vobsub:'VobSub',ass:'ASS/SSA'}, noimg=st.me?!!st.no_img:!!s.users_no_image_subs;
@@ -1108,7 +1108,7 @@ function trackList(){const t=Object.fromEntries(TRACK_TYPES.map(r=>[r[0],r]));
  const base=savedDisp.length?savedDisp:chosen.concat(all.filter(v=>!chosen.includes(v)));
  const seen={}, disp=base.filter(v=>seen[v]?false:(seen[v]=1));
  const shown=(disp.includes('text')?disp:['text'].concat(disp)).concat(all.filter(v=>!disp.includes(v)));
- const rows=shown.map(v=>v==='text'?'<div class="listRow textRow" data-v="text"><input type="checkbox" checked disabled><span class="n"></span><b>Plain text</b><small>Always allowed. Types above it are preferred, types below are a last resort.</small></div>':trackRow(v,t[v][1],t[v][2],chosen.includes(v)));
+ const rows=shown.map(v=>v==='text'?'<div class="listRow textRow" data-v="text"><input type="checkbox" checked disabled><span class="n"></span><b>Plain text</b><small>Always allowed. Types above it are preferred, types below are a last resort.</small>'+handleHtml()+'</div>':trackRow(v,t[v][1],t[v][2],chosen.includes(v)));
  return '<div class="prio trackList" data-k="sub_track_order" data-full="sub_track_display_order">'+rows.join('')+'</div>'+(st&&st.me?'':'<div class="bzNote">'+bazarrNote()+'</div>')}   // admin info - guests never see it
 function bazarrNote(){const bz=st.bazarr_image_subs||{}, nmn={ignore_pgs_subs:'PGS',ignore_vobsub_subs:'VobSub',ignore_ass_subs:'ASS'};
  const ign=Object.keys(bz).filter(k=>bz[k]).map(k=>nmn[k]||k);
