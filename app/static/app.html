@@ -1712,7 +1712,10 @@ const PORT={plex:"32400",radarr:"7878",sonarr:"8989",bazarr:"6767"};   // each p
 const OFFNOTE={"plex":"no rescans, and no audio or subtitle picking in Plex","radarr":"no original language for films, and no film count on Statistics","sonarr":"no original language for series, and no series or episode count on Statistics","bazarr":"the image subtitle formats Bazarr ignores are not read"};
 function icon(t){return '<img class="icon" src="/api/icon?t='+esc(t.id)+'" alt="" onerror="this.remove()">'}   // each app's own icon, fetched by the listener (works from the internet too)
 function splitUrl(url){const m=String(url||"").trim().match(/^(?:(https?):\/\/)?([^\/:]*)(?::(\d+))?/); return {schema:(m&&m[1])||"http",host:(m&&m[2])||"",port:(m&&m[3])||""}}
-function buildUrl(id){const h=document.querySelector('#main input[data-cu="'+id+'"]'),p=document.querySelector('#main input[data-cp="'+id+'"]'); const host=h.value.trim(); if(!host)return ""; return h.dataset.schema+"://"+host+(p.value.trim()?":"+p.value.trim():"")}
+function buildUrl(id){const h=document.querySelector('#main input[data-cu="'+id+'"]'),p=document.querySelector('#main input[data-cp="'+id+'"]'); const host=h.value.trim(); if(!host)return "";
+ /* An empty port box means the program's own default - the one the placeholder shows. Leaving it
+    empty used to build an address with no port at all, which lands on whatever answers on 80. */
+ const port=p.value.trim()||PORT[id]||""; return h.dataset.schema+"://"+host+(port?":"+port:"")}
 function dot(id){const t=conn&&conn.find(x=>x.id===id); if(t&&t.enabled===false)return '<i class="dot off" title="Switched off"></i>'; const r=connst[id]; return '<i class="dot '+(r?(r.ok?"ok":"error"):"")+'"></i>'}
 function connCard(t){
   const r=connst[t.id], keyOf=t.id==="plex"?"Token":"API key", u=splitUrl(t.url), dflt=PORT[t.id];

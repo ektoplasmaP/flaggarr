@@ -20,7 +20,7 @@ import subprocess
 import threading
 from datetime import datetime
 
-VERSION = "0.86.10.10"          # shown in the footer. Bumped on every change to ui.py/the listener.
+VERSION = "0.86.10.11"          # shown in the footer. Bumped on every change to ui.py/the listener.
 
 # The program lives in the image (/app), everything this installation owns lives
 # in the mounted volume (/config): settings, logs, backups.
@@ -798,11 +798,22 @@ def test_connection(service, url=None, key_name=None):
             req = urllib.request.Request(url + "/api/v3/system/status", headers={"X-Api-Key": key_name, "Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=6) as r:
             body = r.read().decode("utf-8", "replace")
+            ctype = (r.headers.get("Content-Type") or "?").split(";")[0].strip()
+        # Something answered, but not the program we asked for. Nearly always the port: an address
+        # without one lands on whatever serves port 80. Say that, rather than the parser's own
+        # exception name - "ParseError" tells nobody which door was knocked on.
+        wrong_door = {"ok": False, "info": "answered with %s, not %s - is the port right?" % (ctype, row[1])}
         if service == "plex":
-            root = ET.fromstring(body)
+            try:
+                root = ET.fromstring(body)
+            except ET.ParseError:
+                return wrong_door
             ver = root.get("version") or "?"
             return {"ok": True, "info": "Plex Media Server " + ver}
-        j = json.loads(body)
+        try:
+            j = json.loads(body)
+        except ValueError:
+            return wrong_door
         if service == "bazarr":
             j = j.get("data", j)
             ver = j.get("bazarr_version") or j.get("version") or "?"
