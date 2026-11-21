@@ -2015,11 +2015,35 @@ async function loadConn(){
   if(page==="connections"){drawn=null; draw()}
   conn.forEach(t=>testConn(t.id));
 }
+/* The dot, the warning on the tab and the Connected pill in the card heading are all drawn from
+   connst, but a finished test only ever patched the dot - the rest stayed as the last draw left
+   them until the page was reloaded. They are patched here instead of redrawing the page: a redraw
+   of this page throws away whatever is half-typed in the host, port and key fields. */
+function connTab(id){
+  const span=document.querySelector('.tab span[data-conn="'+id+'"]'); if(!span)return;
+  const t=conn&&conn.find(x=>x.id===id), r=connst[id], off=!!(t&&t.enabled===false);
+  const d=span.querySelector('.dot'); if(d)d.className="dot "+(off?"off":(r?(r.ok?"ok":"error"):""));
+  let w=span.querySelector('.warnIcon');
+  if(r&&!r.ok&&r.info!=="no address"&&!off){
+    if(!w){w=document.createElement('span'); w.className="warnIcon"; w.innerHTML="&#9888;"; span.appendChild(w)}
+    w.title=r.info;
+  } else if(w)w.remove();
+}
+function connPill(){
+  if(page!=="connections")return;        // every page has a section heading - only this one's pill is ours
+  const h=document.querySelector('#main section h2'); if(!h)return;
+  const t=conn&&conn.find(x=>x.id===connflik), r=connst[connflik], off=!!(t&&t.enabled===false);
+  let p=h.querySelector('.pill');
+  const put=()=>{if(!p){p=document.createElement('span'); h.insertBefore(p,h.children[1]||null)} return p};
+  if(off){put().className="pill"; p.textContent="Switched off"; return}
+  if(!r){if(p)p.remove(); return}        // never tested: no pill, as the first draw has it
+  put().className="pill "+(r.ok?"on":"off"); p.textContent=r.ok?"Connected":"Not connected";
+}
 async function testConn(id,url,key){
   const r=await (await fetch("/api/test",{method:"POST",body:JSON.stringify({service:id,url:url,key:key})})).json();
   connst[id]=r;
-  document.querySelectorAll('.tab span[data-conn="'+id+'"] .dot').forEach(p=>{const t=conn&&conn.find(x=>x.id===id); p.className="dot "+(t&&t.enabled===false?"off":(r.ok?"ok":"error"))});
-  if(connflik===id){const s=$("#testsvar"); if(s){const na=r.info==="no address"; s.innerHTML=na?"":infoHtml(r.info); s.className="testsvar "+(na?"":(r.ok?"ok":"error"))}}
+  connTab(id);
+  if(connflik===id){connPill(); const s=$("#testsvar"); if(s){const na=r.info==="no address"; s.innerHTML=na?"":infoHtml(r.info); s.className="testsvar "+(na?"":(r.ok?"ok":"error"))}}
 }
 async function loadLog(){
   const r=await (await fetch("/api/log?file="+logFile+"&category="+logCategory+"&n=400",{cache:"no-store"})).json();
