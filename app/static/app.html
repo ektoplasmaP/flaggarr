@@ -1800,7 +1800,7 @@ const PAGES={
  overview:()=>{const s=st.settings,k=st.stat;
   const lst=!s.listener?['off','Off','not accepting imports']:k.open_issues?['warn',k.open_issues,'open issue'+(k.open_issues===1?'':'s')+' · see log']:['on','On','listening for new content'];
   return '<h1>Overview</h1><p class="sub">'+(s.listener?'Listening for new content':'Listener is off')+' · up since '+st.up_since+'</p>'
-   +'<div class="cards"><a href="'+(lst[0]==='warn'?'#log':'#automation')+'" title="'+esc(k.last_error||'')+'"'+(lst[0]==='warn'?' data-kind="error"':'')+'><b class="'+lst[0]+'">'+lst[1]+'</b><span>'+esc(lst[2])+'</span></a>'
+   +'<div class="cards"><a href="'+(lst[0]==='warn'?'#log':'#automation')+'" title="'+esc(k.last_error||'')+'"'+(lst[0]==='warn'?' data-kind="error" data-cat="'+esc(k.last_error_cat||'action')+'"':'')+'><b class="'+lst[0]+'">'+lst[1]+'</b><span>'+esc(lst[2])+'</span></a>'
    +'<a href="#statistics"><b>'+k.imports_today+'</b><span>files flagged today</span></a>'
    +'<a href="#automation" title="'+esc(st.next_weekly||'')+'"><b>'+(s.weekly_on&&st.next_weekly?timeUntil(st.next_weekly):'–')+'</b><span>'+(s.weekly_on?'next weekly run':'weekly check off')+'</span></a>'
    +'<a href="#statistics" title="'+esc(k.last_import||'')+'"><b>'+(k.last_import?timeAgo(k.last_import):'–')+'</b><span>last import'+(k.last_import?' · '+esc(k.last_import.slice(5,16)):'')+'</span></a></div>'
@@ -2261,7 +2261,7 @@ document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest
 document.addEventListener("change",e=>{if(e.target.id==="dry"){dryRun=e.target.checked; try{localStorage.setItem("flaggarr_dryrun",dryRun?"1":"0")}catch(x){} drawn=null; draw()}});
 ["input","change","dragend","click"].forEach(t=>document.addEventListener(t,()=>setTimeout(checkDirty,0)));
 document.addEventListener("click",async e=>{
-  const lk_=e.target.closest("a[data-kind]"); if(lk_){logKind=lk_.getAttribute("data-kind"); lastHtml="";}
+  const lk_=e.target.closest("a[data-kind]"); if(lk_){logKind=lk_.getAttribute("data-kind"); if(lk_.dataset.cat){logCategory=lk_.dataset.cat; logFile="all"; logSearch=""; logPage=0} lastHtml="";}
   if(e.target.closest("[data-pw]")){savePassword();return}
   if(e.target.closest("[data-pwdel]")){confirmBox("Reset password?",'<p class="hint" style="margin:0 0 10px">A new random password is set. You get it on screen right after, and it is also written to <code>config/NEW_PASSWORD.txt</code> on the server. Every browser is signed out.</p><p class="hint" style="margin:0">Locked out and cannot sign in to press this? Create an empty file named <code>RESET_PASSWORD</code> in the <code>config</code> folder (File Station) instead - the same reset happens on the next page load, no sign-in needed.</p>',"Reset password",async()=>{const sv=await fetch("/api/credentials_remove",{method:"POST",body:"{}"}); const r=sv.ok?await sv.json():{}; const m2=modal("New password",'<p class="hint" style="margin:0 0 10px">Password <code>'+esc(r.new_password||"see config/NEW_PASSWORD.txt")+'</code></p><p class="hint" style="margin:0">Saved as <code>config/NEW_PASSWORD.txt</code> in the config folder too. Sign in and set your own password.</p>','<span></span><button class="prim" data-close>OK</button>'); m2.addEventListener("click",ev=>{if(ev.target.closest("[data-close]"))setTimeout(()=>location.reload(),80)})});return}
   if(e.target.closest("[data-undo]")){drawn=null; draw(); return}

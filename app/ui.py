@@ -20,7 +20,7 @@ import subprocess
 import threading
 from datetime import datetime
 
-VERSION = "0.86.10.19"          # shown in the footer. Bumped on every change to ui.py/the listener.
+VERSION = "0.86.10.20"          # shown in the footer. Bumped on every change to ui.py/the listener.
 
 # The program lives in the image (/app), everything this installation owns lives
 # in the mounted volume (/config): settings, logs, backups.
@@ -2429,7 +2429,7 @@ def status(listener_log, start_time):
     from datetime import timedelta
     day_window = (datetime.now() - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
     all_items = log_entries(listener_log, 400)
-    open_count, last_error = 0, None            # unresolved listener errors: errors newer than the most recent successful action
+    open_count, last_error, last_error_cat = 0, None, "action"            # unresolved listener errors: errors newer than the most recent successful action
     for p in all_items:                               # newest first
         if p["kind"] == "ok":
             break
@@ -2437,11 +2437,13 @@ def status(listener_log, start_time):
             open_count += 1
             if last_error is None:
                 last_error = p["text"].split("\n")[0][:120]
+                last_error_cat = p["category"]           # the Log tab the card opens, so the errors are actually there
     stat = {"imports_today": sum(1 for p in entries if p["ts"].startswith(today) and p["text"].startswith("OK (")),
             "errors_today": sum(1 for p in entries if p["ts"].startswith(today) and p["kind"] == "error"),
             "errors_24h": sum(1 for p in all_items if p["ts"] >= day_window and p["kind"] == "error"),
             "open_issues": open_count,
             "last_error": last_error,
+            "last_error_cat": last_error_cat,
             "last_import": next((p["ts"] for p in entries if p["text"].startswith("OK (")), None)}
     return {
         "settings": read_settings(),
