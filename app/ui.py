@@ -20,7 +20,7 @@ import subprocess
 import threading
 from datetime import datetime
 
-VERSION = "0.86.10.13"          # shown in the footer. Bumped on every change to ui.py/the listener.
+VERSION = "0.86.10.14"          # shown in the footer. Bumped on every change to ui.py/the listener.
 
 # The program lives in the image (/app), everything this installation owns lives
 # in the mounted volume (/config): settings, logs, backups.

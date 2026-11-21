@@ -872,7 +872,8 @@ function ruleBox(title,pre){
  if(cxP.length)co.push('Prefer: '+cxP.join(', ')); if(cxA.length)co.push('Avoid: '+cxA.join(', ')); if(!co.length)co.push('No rules \u2014 the track with the most channels wins');
  const head=(h,m)=>'<span class="rbh">'+h+(m?' <span class="rbm">\u00b7 '+m+'</span>':'')+'</span>';   // the section, then the card that is chosen
  const ul=a=>'<ul>'+a.map(r=>'<li>'+r+'</li>').join('')+'</ul>';
- return '<div class="ruleBox"><b>'+(title||'Summary')+'</b>'+head('Audio',mode==='x'?'':AUDIO_CARDS[mode])+ul(au)+head('Subtitles',off?'':SUB_CARDS[nev?'2':(fol?'1':'0')]+(nev&&w('sub_track_order').includes('forced')?' \u00b7 forced lines only':''))+ul(su)+(pre?'':head('Subtitle types')+ul(ty)+head('Codecs')+ul(co))+'</div>'}
+ const ORD=['First','Second','Third','Fourth','Fifth','Sixth','Seventh','Eighth','Ninth','Tenth'], nat=langs.map((v,i)=>(ORD[i]||(i+1)+'.')+': '+L(v));   // your languages, in order, on top
+ return '<div class="ruleBox"><b>'+(title||'Summary')+'</b>'+(nat.length?head('Your native languages')+ul(nat):'')+head('Audio',mode==='x'?'':AUDIO_CARDS[mode])+ul(au)+head('Subtitles',off?'':SUB_CARDS[nev?'2':(fol?'1':'0')]+(nev&&w('sub_track_order').includes('forced')?' \u00b7 forced lines only':''))+ul(su)+(pre?'':head('Subtitle types')+ul(ty)+head('Codecs')+ul(co))+'</div>'}
 /* Languages: the summary follows the form, saved or not. */
 function summarySync(){const b=document.getElementById('langsum'), t=document.getElementById('tagsum'); if(!b&&!t)return;
  const saved=st.settings; st.settings=Object.assign({},saved,JSON.parse(formValue()));
