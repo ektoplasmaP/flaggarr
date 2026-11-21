@@ -20,7 +20,7 @@ import subprocess
 import threading
 from datetime import datetime
 
-VERSION = "0.86.10.15"          # shown in the footer. Bumped on every change to ui.py/the listener.
+VERSION = "0.86.10.16"          # shown in the footer. Bumped on every change to ui.py/the listener.
 
 # The program lives in the image (/app), everything this installation owns lives
 # in the mounted volume (/config): settings, logs, backups.
@@ -2817,7 +2817,7 @@ def handle_post(h, body, log):
         return True
     if p == "/api/plex_pin":
         if not (active_env().get("PLEX_TOKEN") or "").strip():   # no Plex connection: nobody can be matched, so say so before plex.tv
-            _json(h, {"ok": False, "msg": "Plex is not connected yet. Sign in with the password and connect Plex under Connections first."})
+            _json(h, {"ok": False, "msg": "Plex sign-in is not available yet. The administrator has to connect Plex first, under Connections."})
             return True
         try:
             _json(h, dict(plex_pin_new(), ok=True))
