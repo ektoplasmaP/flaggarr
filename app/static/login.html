@@ -78,7 +78,7 @@ if(pb)pb.addEventListener("click",async()=>{
   pb.disabled=true; eEl.textContent="";
   let pin=null;
   try{pin=await (await fetch("/api/plex_pin",{method:"POST",headers:{"X-Requested-With":"flaggarr"},body:"{}"})).json()}catch(x){}
-  if(!pin||!pin.id){eEl.textContent="Could not reach plex.tv"; pb.disabled=false; return}
+  if(!pin||!pin.id){eEl.textContent=(pin&&pin.msg)||"Could not reach plex.tv"; pb.disabled=false; return}
   try{sessionStorage.setItem("flg_pin",String(pin.id))}catch(x){}
   location.href="https://app.plex.tv/auth#?clientID="+encodeURIComponent(pin.client)+"&code="+encodeURIComponent(pin.code)+"&context%5Bdevice%5D%5Bproduct%5D=flaggarr&forwardUrl="+encodeURIComponent(location.origin+"/");
 });
