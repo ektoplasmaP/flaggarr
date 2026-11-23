@@ -285,12 +285,9 @@ def pick_subtitle(tracks, want, sdh="never", forced="last", pgs="never", vobsub=
     """The subtitle track that should be default, or None.
 
     Ranked, most important first:
-      1. track type - SDH, forced, PGS, VobSub and ASS/SSA are ranked by their settings under
-         Subtitles -> Subtitle types, and that comes before language, so a plain
-         text track in your second language beats a forced track in your first.
-         Forced is weighed first of the types: when it is a last resort it loses
-         to every full track, an SDH or image one included, since it only covers
-         the few lines in another language
+      1. track type - forced, then SDH, then PGS, VobSub and ASS/SSA, each ranked by its
+         setting under Subtitles -> Subtitle types. That comes before language, so a
+         plain text track in your second language beats a forced track in your first
       2. the language order in `want`
       3. an internal track before an external .srt
       4. the order in the file
