@@ -285,12 +285,14 @@ def pick_subtitle(tracks, want, sdh="never", forced="last", pgs="never", vobsub=
     """The subtitle track that should be default, or None.
 
     Ranked, most important first:
-      1. track type - forced, then SDH, then PGS, VobSub and ASS/SSA, each ranked by its
-         setting under Subtitles -> Subtitle types. That comes before language, so a
-         plain text track in your second language beats a forced track in your first
-      2. the language order in `want`
-      3. an internal track before an external .srt
-      4. the order in the file
+      1. track type - each of SDH, forced, PGS, VobSub and ASS/SSA ranked by its setting
+         under Subtitles -> Subtitle types; a track of several types takes its best.
+         That comes before language, so a plain text track in your second language
+         beats a forced track in your first
+      2. a full track before a forced one, which only covers the lines in another language
+      3. the language order in `want`
+      4. an internal track before an external .srt
+      5. the order in the file
     """
     if not want:
         return None
@@ -310,16 +312,17 @@ def pick_subtitle(tracks, want, sdh="never", forced="last", pgs="never", vobsub=
             continue
         if t.lang not in want:
             continue
-        candidates.append((_type_rank(t.forced, forced),
-                           _type_rank(t.sdh, sdh),
-                           _type_rank(bool(stype), mode),
+        ranks = [_type_rank(True, m) for is_type, m in
+                 ((t.sdh, sdh), (t.forced, forced), (stype, mode)) if is_type]
+        candidates.append((min(ranks, default=0),
+                           1 if t.forced else 0,
                            want.index(t.lang),
                            1 if t.external else 0,
                            t.order, t))
     if not candidates:
         return None
-    candidates.sort(key=lambda c: c[:6])
-    return candidates[0][6]
+    candidates.sort(key=lambda c: c[:5])
+    return candidates[0][5]
 
 
 # ---------- the mkv side ----------
