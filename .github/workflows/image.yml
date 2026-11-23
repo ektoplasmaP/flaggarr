@@ -22,7 +22,9 @@ jobs:
 
       - name: Read the version from app/ui.py
         id: v
-        run: echo "version=$(sed -n 's/^VERSION *= *"\([^"]*\)".*/\1/p' app/ui.py)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(sed -n 's/^VERSION *= *"\([^"]*\)".*/\1/p' app/ui.py)" >> "$GITHUB_OUTPUT"
+          echo "built=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -46,6 +48,8 @@ jobs:
           context: .
           push: true
           tags: ${{ steps.t.outputs.tags }}
-          build-args: VERSION=${{ steps.v.outputs.version }}
+          build-args: |
+            VERSION=${{ steps.v.outputs.version }}
+            BUILT=${{ steps.v.outputs.built }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

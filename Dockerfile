@@ -23,7 +23,12 @@ CMD ["python3", "/app/webhook_listener.py"]
 # version they are not. To read it straight from the source:
 #   docker build --build-arg VERSION="$(sed -n 's/^VERSION *= *"\([^"]*\)".*/\1/p' app/ui.py)" -t flaggarr:latest .
 ARG VERSION=dev
+# When the image was built, in UTC. The published image gets it from the workflow and the
+# About page shows it; a local build leaves it empty and the page says so.
+ARG BUILT=""
+ENV FLAGGARR_BUILT="${BUILT}"
 LABEL org.opencontainers.image.title="flaggarr" \
+      org.opencontainers.image.created="${BUILT}" \
       org.opencontainers.image.description="Sets the default audio and subtitle flags inside mkv files, and corrects the playback choice Plex saved for what the flag cannot reach." \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.source="https://github.com/ektoplasmaP/flaggarr"
