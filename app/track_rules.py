@@ -287,7 +287,10 @@ def pick_subtitle(tracks, want, sdh="never", forced="last", pgs="never", vobsub=
     Ranked, most important first:
       1. track type - SDH, forced, PGS, VobSub and ASS/SSA are ranked by their settings under
          Subtitles -> Subtitle types, and that comes before language, so a plain
-         text track in your second language beats a forced track in your first
+         text track in your second language beats a forced track in your first.
+         Forced is weighed first of the types: when it is a last resort it loses
+         to every full track, an SDH or image one included, since it only covers
+         the few lines in another language
       2. the language order in `want`
       3. an internal track before an external .srt
       4. the order in the file
@@ -310,8 +313,8 @@ def pick_subtitle(tracks, want, sdh="never", forced="last", pgs="never", vobsub=
             continue
         if t.lang not in want:
             continue
-        candidates.append((_type_rank(t.sdh, sdh),
-                           _type_rank(t.forced, forced),
+        candidates.append((_type_rank(t.forced, forced),
+                           _type_rank(t.sdh, sdh),
                            _type_rank(bool(stype), mode),
                            want.index(t.lang),
                            1 if t.external else 0,

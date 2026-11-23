@@ -114,8 +114,11 @@ account's own profile.
 Tracks -> Subtitle types: unticked is never, below Plain text is last resort, above
 it is preferred. That ranking comes
 **before** language, so a plain text track in your second language beats a forced
-track in your first. Within the same rank the language order decides, then an
-internal track before an external .srt, then the order in the file.
+track in your first. Forced is weighed before the other types, so a forced track
+that is a last resort loses to any full track, SDH or image ones included: it
+only covers the few lines in another language. Within the same rank the language
+order decides, then an internal track before an external .srt, then the order in
+the file.
 
 Only SubRip/SRT can become default by default. ASS/SSA is text-based but carries
 styling and its own fonts that many Plex clients (Chromecast, Roku, some smart
