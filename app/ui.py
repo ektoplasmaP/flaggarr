@@ -22,7 +22,7 @@ import subprocess
 import threading
 from datetime import datetime
 
-VERSION = "0.86.12"          # shown in the footer. Bumped on every delivered change, whatever file.
+VERSION = "0.86.12.1"          # shown in the footer. Bumped on every delivered change, whatever file.
 
 # The program lives in the image (/app), everything this installation owns lives
 # in the mounted volume (/config): settings, logs, backups.

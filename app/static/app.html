@@ -1955,7 +1955,7 @@ const PAGES={
 ,
  about:()=>'<h1>About</h1><p class="sub">flaggarr v'+st.version+'</p>'
    +'<section><h2>flaggarr</h2><table class="stat">'
-   +'<tr><td>Version</td><td>'+st.version+(st.built&&!isNaN(new Date(st.built))?' <span style="color:var(--mut);font-size:.85rem">· published '+new Date(st.built).toLocaleString('sv-SE',{dateStyle:'short',timeStyle:'short'})+'</span>':' <span style="color:var(--mut);font-size:.85rem">· built locally</span>')+'</td></tr>'
+   +'<tr><td>Version</td><td>'+st.version+(st.built&&!isNaN(new Date(st.built))?' <span style="color:var(--mut);font-size:.85rem">· published '+new Date(st.built).toLocaleString(undefined,{dateStyle:'short',timeStyle:'short'})   /* undefined: the visitor's own locale, not one country's */+'</span>':' <span style="color:var(--mut);font-size:.85rem">· built locally</span>')+'</td></tr>'
    +'<tr><td>Container</td><td><code>flaggarr</code>, port 8899: '+(st.built?'image <code>ghcr.io/ektoplasmap/flaggarr</code>':'built from the project folder')+'</td></tr>'
    +'<tr><td>Address</td><td><a href="'+esc(location.origin)+'">'+esc(location.origin)+'</a> <span style="color:var(--mut);font-size:.85rem">(the address you are on right now)</span></td></tr>'
    +'<tr><td>Uptime</td><td>'+(()=>{const a=new Date(String(st.up_since||"").replace(" ","T")),b=new Date(String(st.now||"").replace(" ","T")),m=Math.round((b-a)/60000);return isFinite(m)&&m>=0?(m<60?m+" min":m<2880?Math.round(m/60)+" h":Math.round(m/1440)+" days"):"–";})()+' <span style="color:var(--mut);font-size:.85rem">(up since '+st.up_since+')</span></td></tr>'
