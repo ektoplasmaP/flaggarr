@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Corrects the saved Plex audio and subtitle selections for your account. The file itself is never touched.
 
-Run automatically by webhook_listener.py after every import (--recent 5), and
+Run automatically by webhook_listener.py after every import (--recent N, N from
+the size of the batch), and
 can be run by hand over the whole library.
 
 Audio: the original language first when it is known, then the audio priority list.
@@ -11,14 +12,16 @@ Subtitles, based on the original language of the title:
     a same-language title     -> subtitles in that language
     anything else             -> the subtitle list, in order
 
-A full subtitle always beats a forced one, even across the language boundary: a
-full English subtitle wins over a forced track in your own language. Within the
-same rank the language order decides, then internal SRT before external. Track
-type is decided before language - see Subtitles -> Subtitle types in the UI.
+Track type is decided before language, from the settings under Tracks ->
+Subtitle types, so a plain text track in your second language beats a forced
+track in your first. Within one type rank a full subtitle beats a forced one,
+then the language order decides, then internal SRT before external.
 
-Only text-based subtitles can be selected (TEXT_CODECS): SubRip/SRT in mkv and
-mov_text in mp4/m4v. PGS and VobSub are images and cannot be preselected.
-ASS/SSA does not count either - it is usually a signs track, not dialogue.
+PGS, VobSub and ASS/SSA are only considered when their own type under Tracks ->
+Subtitle types is something other than Never, and the Never use image-based
+subtitles switch takes them out whatever that says. Left at Never, which is the
+default, only text tracks are selected: SubRip/SRT in mkv and mov_text in
+mp4/m4v (TEXT_CODECS).
 
 This script is the only way to preselect an external .srt or mov_text in an
 mp4: a default flag is a property of a track inside a Matroska file, and when
@@ -52,7 +55,7 @@ LANGUAGE_CODES = {name: set((code,) + aliases)
                   for name, (code, aliases) in rules.LANGUAGES.items()}
 
 
-# The lists from the UI (Media), as Plex names: understood without subtitles /
+# The lists from the UI (Languages), as Plex names: understood without subtitles /
 # subtitled in the same language / otherwise in order.
 NATIVE_NAMES = tuple(os.environ.get("NATIVE_LANGS_NAMES", "swedish").split())
 SAME_SUB_NAMES = tuple(os.environ.get("SAME_SUB_LANGS_NAMES", "english").split())
@@ -64,13 +67,13 @@ AUDIO_PRIO = tuple(os.environ.get("AUDIO_PRIORITY", "eng swe").split())
 ALT_AUDIO_PRIO = tuple(os.environ.get("ALT_AUDIO_PRIORITY", "").split())
 ALT_NATIVE_NAMES = tuple(os.environ.get("ALT_NATIVE_LANGS_NAMES", "").split())
 ALT_SAME_NAMES = tuple(os.environ.get("ALT_SAME_SUB_LANGS_NAMES", "").split())
-# Subtitle track types (UI: Subtitles -> Subtitle types)
+# Subtitle track types (UI: Tracks -> Subtitle types)
 SUB_SDH = os.environ.get("SUB_SDH", "never")        # never | last | allowed | first
 SUB_FORCED = os.environ.get("SUB_FORCED", "last")   # never | last | allowed | first
 SUB_PGS = os.environ.get("SUB_PGS", "never")
 SUB_VOBSUB = os.environ.get("SUB_VOBSUB", "never")
 SUB_FORCED_MODE = os.environ.get("SUB_FORCED_MODE", "nofull")   # nofull | native
-SUB_ASS = os.environ.get("SUB_ASS", "never")  # never | last (PGS/VobSub as a last resort - internal tracks only)
+SUB_ASS = os.environ.get("SUB_ASS", "never")
 CODEC_RULES = os.environ.get("AUDIO_CODEC_RULES", "").replace(",", " ").split()
 
 
@@ -114,7 +117,10 @@ def language_map(base, key, kind):
                 continue
             try:
                 files = get(b + "/api/v3/episodefile?seriesId=%s" % s["id"], h)
-            except Exception:
+            except Exception as exc:
+                # Without this line the episodes land in "no match in Radarr/Sonarr",
+                # which blames the library for what was a timeout or a 500.
+                print("ERROR: could not read episode files for %s: %s" % (s.get("title"), exc))
                 continue
             for f in files:
                 if f.get("path"):
@@ -321,7 +327,7 @@ def handle(base, token, title_name, part, orig, apply_changes, log, unknown_lang
             description.append("text -> %s %s" % (
                 "external" if val.get("key") else "internal",
                 val.get("languageCode") or "-"))
-        elif cur_sub is not None and _is_sdh(cur_sub) and SUB_SDH == "never":  # PRIO
+        elif cur_sub is not None and _is_sdh(cur_sub) and SUB_SDH == "never":
             # An SDH track must not stay selected. When there is no acceptable
             # track to switch to we clear the selection instead of leaving it.
             changes["subtitleStreamID"] = 0

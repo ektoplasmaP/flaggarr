@@ -17,8 +17,10 @@ pick_subtitle(). Run as a script this module is the mkv side: it reads
 `mkvmerge -J` JSON on stdin and prints what the shell script needs.
 
 The settings come from the environment, the same ones settings_env.py writes:
-AUDIO_PRIORITY, NATIVE_LANGS, SAME_SUB_LANGS, SUB_LANGS, SUB_SDH, SUB_FORCED,
-SUB_PGS, SUB_VOBSUB, SUB_ASS, SUB_CODECS.
+AUDIO_PRIORITY, AUDIO_CODEC_RULES, NATIVE_LANGS, SAME_SUB_LANGS, SUB_LANGS,
+SUB_RULES, SUB_SDH, SUB_FORCED, SUB_FORCED_MODE, SUB_PGS, SUB_VOBSUB, SUB_ASS,
+SUB_CODECS, and for the tagged set ALT_TAG, ALT_AUDIO_PRIORITY, ALT_NATIVE_LANGS,
+ALT_SAME_SUB_LANGS, ALT_SUB_RULES and FLAGGARR_TAG_MAP.
 """
 
 import json
@@ -188,8 +190,9 @@ def pick_audio(tracks, prefer, commentary_fallback=False, any_fallback=False, co
 
     commentary_fallback  take a commentary track when it is the only one left
     any_fallback         when no language matches, keep the track that is
-                         already default if there is exactly one, otherwise
-                         take the one with most channels
+                         already default, if there is exactly one and its codec
+                         is not avoided; otherwise run the same ladder without
+                         the language step, codec rules before channel count
 
     The mkv side sets both: the flag has to point somewhere. The Plex side
     sets neither, so an unclear file keeps whatever Plex already chose.
@@ -286,7 +289,7 @@ def pick_subtitle(tracks, want, sdh="never", forced="last", pgs="never", vobsub=
 
     Ranked, most important first:
       1. track type - each of SDH, forced, PGS, VobSub and ASS/SSA ranked by its setting
-         under Subtitles -> Subtitle types; a track of several types takes its best.
+         under Tracks -> Subtitle types; a track of several types takes its best.
          That comes before language, so a plain text track in your second language
          beats a forced track in your first
       2. a full track before a forced one, which only covers the lines in another language
@@ -308,21 +311,22 @@ def pick_subtitle(tracks, want, sdh="never", forced="last", pgs="never", vobsub=
             continue
         if t.forced and forced == "never":
             continue
-        if forced == "only" and not t.forced:      # the row asks for forced subtitles only
+        if forced == "only" and not t.forced:
             continue
         if t.lang not in want:
             continue
         ranks = [_type_rank(True, m) for is_type, m in
                  ((t.sdh, sdh), (t.forced, forced), (stype, mode)) if is_type]
         candidates.append((min(ranks, default=0),
-                           1 if t.forced else 0,
+                           1 if t.forced else 0,   # forced is in the rank above too; this only
+                                                  # separates them where Forced is "allowed"
                            want.index(t.lang),
                            1 if t.external else 0,
                            t.order, t))
     if not candidates:
         return None
-    candidates.sort(key=lambda c: c[:5])
-    return candidates[0][5]
+    candidates.sort(key=lambda c: c[:-1])
+    return candidates[0][-1]
 
 
 # ---------- the mkv side ----------
@@ -481,10 +485,11 @@ def settings_for(path):
     return s
 
 
-ORIGINAL = "orig"
+ORIGINAL = "orig"    # the row in the language list that stands for the title's
+                     # own language, whatever that turns out to be
 SKIP = "skip"        # reserved, not a language: a row that is not ours to touch,
-                     # or, first in an audio order, a whole set that is not          # the row in the language list that stands for the
-                           # title's own language, whatever that turns out to be
+                     # or, first in an audio order, a whole set that is not ours
+                     # to write
 
 
 def language_map(name):
@@ -605,6 +610,86 @@ def mkv_decision(data, original="", do_audio=True, do_subs=True):
     return audio_num, audio_lang, note, " ".join(args), " ".join(undo)
 
 
+def _selftest():
+    """The rules, checked against the cases that are easy to break.
+
+    There is no test suite in this repo, so a change to the ranking has nothing
+    that goes red. These asserts are that: `track_rules.py --selftest` runs in
+    well under a second, needs no library and no media, and names the rule it
+    caught. Add a case here whenever the ranking changes.
+    """
+    def A(order, lang, ch=2, **kw):
+        return Track("audio", order, lang, order, channels=ch, **kw)
+
+    def S(order, lang, **kw):
+        return Track("subtitles", order, lang, order, **kw)
+
+    def ref(t):
+        return None if t is None else t.ref
+
+    # pick_audio: the order in prefer decides, before anything else
+    two = [A(1, "eng", 2), A(2, "swe", 6)]
+    assert ref(pick_audio(two, ["swe", "eng"])) == 2, "prefer order ignored"
+    assert ref(pick_audio(two, ["eng", "swe"])) == 1, "prefer order ignored"
+
+    # within one language, most channels
+    assert ref(pick_audio([A(1, "eng", 2), A(2, "eng", 6)], ["eng"])) == 2, "channel count ignored"
+
+    # commentary is dropped, and only taken when asked for and alone
+    mixed = [A(1, "eng", 6, commentary=True), A(2, "eng", 2)]
+    assert ref(pick_audio(mixed, ["eng"])) == 2, "commentary not dropped"
+    only = [A(1, "eng", 6, commentary=True)]
+    assert pick_audio(only, ["eng"]) is None, "commentary taken without the fallback"
+    assert ref(pick_audio(only, ["eng"], commentary_fallback=True)) == 1, "commentary fallback dead"
+
+    # a preferred codec beats the channel count, an avoided one is still taken alone
+    cx = [A(1, "eng", 6, codec="dts"), A(2, "eng", 2, codec="truehd")]
+    assert ref(pick_audio(cx, ["eng"], codecs="truehd:prefer")) == 2, "prefer lost to channels"
+    assert ref(pick_audio(cx, ["eng"], codecs="dts:avoid")) == 2, "avoid not applied"
+    lone = [A(1, "eng", 6, codec="dts")]
+    assert ref(pick_audio(lone, ["eng"], codecs="dts:avoid")) == 1, "avoided codec dropped when alone"
+
+    # no language matches: the track already default is kept, if there is just one
+    none_match = [A(1, "fre", 2), A(2, "ger", 6, default=True)]
+    assert pick_audio(none_match, ["eng"]) is None, "picked a language nobody asked for"
+    assert ref(pick_audio(none_match, ["eng"], any_fallback=True)) == 2, "default track not kept"
+
+    # pick_subtitle: type comes before language, so plain text in the second
+    # language beats a forced track in the first
+    assert ref(pick_subtitle([S(1, "swe", forced=True), S(2, "eng")], ["swe", "eng"])) == 2, \
+        "forced in the first language beat full text in the second"
+
+    # a full track before a forced one, in the same language and with SDH too
+    assert ref(pick_subtitle([S(1, "eng", forced=True), S(2, "eng")], ["eng"], forced="allowed")) == 2, \
+        "forced beat a full track"
+    assert ref(pick_subtitle([S(1, "eng", sdh=True, forced=True), S(2, "eng", sdh=True)],
+                             ["eng"], sdh="first", forced="allowed")) == 2, \
+        "forced SDH beat full SDH"
+
+    # the gates: never means never, only means nothing else
+    assert pick_subtitle([S(1, "eng", forced=True)], ["eng"], forced="never") is None, \
+        "forced track survived never"
+    assert pick_subtitle([S(1, "eng", text=False, codec="hdmv_pgs_subtitle")], ["eng"]) is None, \
+        "image track survived the default never"
+    assert ref(pick_subtitle([S(1, "eng"), S(2, "eng", forced=True)], ["eng"], forced="only")) == 2, \
+        "only took a full track"
+    assert pick_subtitle([S(1, "eng")], []) is None, "picked a subtitle with nothing wanted"
+
+    # want_sub_langs: understood needs no text, same means its own language,
+    # a mapped row names one language and the fallback follows
+    assert want_sub_langs("swe", ["swe"], [], ["eng"]) == [], "a native language still got text"
+    assert want_sub_langs("eng", [], ["eng"], ["swe"]) == ["eng"], "same did not give its own language"
+    assert want_sub_langs("jpn", [], [], ["swe", "eng"], {"jpn": "eng"}) == ["eng", "swe"], \
+        "a mapped row did not come first"
+
+    # sub_plan: a never row that still wants the forced lines
+    assert sub_plan("eng", [], [], set(), "last", never_only=["eng"]) == (["eng"], "only"), \
+        "never_only lost the forced lines"
+
+    print("track_rules: all checks passed")
+    return 0
+
+
 def main():
     original, do_audio, do_subs = "", True, True
     argv = sys.argv[1:]
@@ -616,6 +701,8 @@ def main():
             do_subs = False
         elif a == "--subs-only":
             do_audio = False
+        elif a == "--selftest":
+            return _selftest()
     try:
         data = json.load(sys.stdin)
     except Exception:

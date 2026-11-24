@@ -56,7 +56,7 @@ button{font:inherit;width:100%;margin-top:14px;padding:9px;border-radius:6px;bor
 <div id="help"><b style="color:var(--fg)">Reset it on the server</b><ol><li>Create an empty file named <code>RESET_PASSWORD</code> in the config folder, next to <code>settings.json</code>.</li><li>Reload this page. The file is used up right away.</li><li>Sign in with the password now waiting in <code>NEW_PASSWORD.txt</code> in that same folder. It is deleted automatically once you are in.</li><li>Pick your own password under General &rarr; Security.</li></ol></div></form>
 <script>
 let theme=""; try{theme=localStorage.getItem("flaggarr_theme")||""}catch(e){}
-function themeUI(){const b=document.getElementById("themeBtn"); if(!b)return; const t=theme||"auto"; b.classList.remove("t-light","t-auto","t-dark"); b.classList.add("t-"+t); b.setAttribute("aria-label","Theme: "+t); b.title="Theme: "+t+" \u2014 light / auto / dark"}
+function themeUI(){const b=document.getElementById("themeBtn"); if(!b)return; const t=theme||"auto"; b.classList.remove("t-light","t-auto","t-dark"); b.classList.add("t-"+t); b.setAttribute("aria-label","Theme: "+t); b.title="Theme: "+t+" (light / auto / dark)"}
 themeUI();
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("#themeBtn"); if(!b)return; const r=b.getBoundingClientRect(), T=["light","","dark"];   // a click picks the third it lands on; Enter/Space steps light, auto, dark
  theme=e.detail===0?T[(T.indexOf(theme)+1)%3]:T[Math.max(0,Math.min(2,Math.floor((e.clientX-r.left)/(r.width/3))))];

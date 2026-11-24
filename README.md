@@ -30,9 +30,8 @@ file as it arrives, and corrects the choice Plex has saved.
   you do not want; everything else works without it.
 - **Docker** - flaggarr runs as one container, next to the others.
 
-Built for a Synology NAS. Nothing in the code is Synology-specific, but every
-default path and the time zone are shaped for one, so expect to change them
-elsewhere.
+Nothing in the code is tied to one kind of host, but the default paths and the
+time zone are shaped for the machine it grew up on, so expect to change them.
 
 What it does in detail, the rules, and every script are described in
 [REFERENCE.md](REFERENCE.md). Every setting, its default value and what it
@@ -56,18 +55,17 @@ things a web page cannot set: the mounts, the port and the user.
 
 ## Install
 
-1. Make a folder for it, for example `/volume1/docker/flaggarr` on a Synology,
-   and put a copy of [`compose.example.yaml`](compose.example.yaml) there as
-   `compose.yaml`. It pulls the ready-made image
+1. Make a folder for it and put a copy of
+   [`compose.example.yaml`](compose.example.yaml) there as `compose.yaml`. It pulls the ready-made image
    `ghcr.io/ektoplasmap/flaggarr`, so there is nothing to clone or build.
 2. Point the media volume at your library. That path must be the **same inside
    and outside** the container, so the paths Radarr and Sonarr send in the
    webhook work without translation. `PUID`/`PGID` start commented out, which
    runs the program as root - that works everywhere, and you can narrow it
    later (see below).
-3. Start it. On a Synology: Container Manager -> Project -> create a project
-   pointing at this folder. Elsewhere: `docker compose up -d`.
-4. Open `http://<your-nas>:8899/`. It asks you to pick a password before it
+3. Start it with `docker compose up -d`. A NAS with a container manager in its
+   own web interface can instead make a project pointing at this folder.
+4. Open `http://<the-host>:8899/`. It asks you to pick a password before it
    shows anything else. After that a **Quick start** wizard asks
    four questions, and the rest of the page stays out of reach until it is
    finished or skipped.
@@ -128,11 +126,11 @@ containers use, one with read/write on the media library, because mkvpropedit
 writes into the files and the cleanup jobs move them. `compose.example.yaml`
 says how to find your own numbers.
 
-On a Synology, ownership alone is not always enough: a folder that was created
-from File Station or DSM follows its ACL rather than the Unix owner. If the
-program reports that `/config` is not writable even though the files belong to
-that user, give the user Read/Write on the folder in File Station (Properties ->
-Permission, applied to sub-folders and files), and the same on the media share.
+On a network share, ownership alone is not always enough: a folder created
+through the host's own file manager often follows an ACL rather than the Unix
+owner. If the program reports that `/config` is not writable even though the
+files belong to that user, give the user read and write on the folder in that
+file manager, applied to everything under it, and the same on the media share.
 
 ## Sign-in
 

@@ -8,8 +8,8 @@ directory structure preserved, plus a manifest of what was moved from where.
 
 The default is --tags native-original --lang en, that is, loose English subtitles
 next to native-language originals. The native-original tag is set by the auto
-tagging in Radarr/Sonarr on titles whose original language is Swedish; on that
-content there should be Swedish text but no English.
+tagging in Radarr/Sonarr. The tag marks the titles this rule is for, and the
+languages to remove are the ones the settings name.
 
 The script only touches TAGGED titles. --lang must therefore not be empty -
 without a language filter the Swedish subtitles would be moved aside too, which
@@ -162,9 +162,10 @@ def main():
     os.makedirs(args.quarantine, exist_ok=True)
 
     moved = failed = 0
-    with open(manifest_path, "a", encoding="utf-8") as mf:
+    # Line-buffered, and the row before the move: see manual_trashfiles_cleanup.py.
+    with open(manifest_path, "a", encoding="utf-8", buffering=1) as mf:
         for kind, title, code, path in present:
-            # Directory structure preserved relative to the library root (Filmer/..., Serier/...)
+            # Directory structure preserved relative to the library root
             root = args.root.rstrip("/")
             rel = path.lstrip("/")
             if root and path.startswith(root + "/"):
@@ -176,8 +177,8 @@ def main():
                     mf.write("%s\tDELETED\n" % path)
                 else:
                     os.makedirs(os.path.dirname(dest), exist_ok=True)
-                    shutil.move(path, dest)
                     mf.write("%s\t%s\n" % (path, dest))
+                    shutil.move(path, dest)
                 moved += 1
             except Exception as exc:
                 print("  FAILED: %s (%s)" % (path, exc))
@@ -188,7 +189,7 @@ def main():
     else:
         print("Moved %d files to %s" % (moved, args.quarantine))
     if failed:
-        print("%d failed - see the lines above." % failed)
+        print("ERROR: %d files could not be moved - see the lines above." % failed)
     print("Manifest (from -> to): %s" % manifest_path)
     print()
     print("Then run a library scan in Plex so the tracks disappear from the interface.")

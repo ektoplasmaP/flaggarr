@@ -20,6 +20,8 @@ log() { echo "[scheduled] $*"; }
 
 log "start $(date '+%Y-%m-%d %H:%M')"
 
-python3 "$APP_DIR/auto_mkv_defaultflags_batch.py" --apply || log "mkv flags: failed"
+# exit 1, not just a log line: the Run page reads the exit code, and a swallowed
+# failure here shows the weekly check as OK while nothing was flagged.
+python3 "$APP_DIR/auto_mkv_defaultflags_batch.py" --apply || { log "ERROR: mkv flags failed"; exit 1; }
 
 log "done"

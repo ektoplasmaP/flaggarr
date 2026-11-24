@@ -14,12 +14,16 @@
 
 # Webhook listener for Radarr and Sonarr. HTTP server on port 8899.
 #
-# Handles On File Import and On File Upgrade. Reads the file path and the
-# original language from the payload, checks that the file sits under the media
-# root, is an .mkv and exists on disk, and then runs:
+# Handles the Download and Rename events, which cover On File Import, On File
+# Upgrade and a rename. Reads the file path and the original language from the
+# payload, checks that the file sits under the media root and exists on disk,
+# and then, for an .mkv, runs:
 #   1. auto_set_mkv_defaultflags.sh          writes the flags into the file
 #   2. a rescan of that one folder in Plex
 #   3. auto_set_plex_defaults.py --recent N   after 60 s, N = files in the batch + 5 (at least 5)
+#
+# An .mp4, .m4v or .mov carries no flags, so those skip step 1 and only reach
+# the Plex step, and only when the matching setting allows it.
 #
 # Answers 200 immediately and works in a background thread, so Radarr never
 # times out. The connections come from settings.json via ui.load_env().
@@ -28,14 +32,16 @@
 # land close together they are collected for 15 seconds and run in one go -
 # earlier the later episodes were simply dropped.
 #
-# NOTE: DSM's text editor does not save this file reliably - edits roll back.
-# Upload it through File Station instead.
+# NOTE: the container runs the code baked into the image. Editing this file on
+# the host changes nothing, because compose mounts /config and the media path
+# only: build a new image and pull it.
 
 import json
 import os
 import re
 import subprocess
 import threading
+import traceback
 import queue
 import time
 import urllib.parse
@@ -155,19 +161,22 @@ def plex(count=0):
 
 
 def _plex_worker():
+    # The whole body is inside the try: anything raised out here kills the thread for
+    # good, and post_process() keeps its "started" flag, so every later import logs
+    # "queued" and nothing ever runs it. Only a container restart would show it.
     while True:
-        folder, count = _plex_queue.get()
-        folders = [folder]
-        time.sleep(ui.read_settings()["batch_sec"])
         try:
-            while True:
-                m, a = _plex_queue.get_nowait()
-                count += a
-                if m not in folders:
-                    folders.append(m)
-        except queue.Empty:
-            pass
-        try:
+            folder, count = _plex_queue.get()
+            folders = [folder]
+            time.sleep(ui.read_settings()["batch_sec"])
+            try:
+                while True:
+                    m, a = _plex_queue.get_nowait()
+                    count += a
+                    if m not in folders:
+                        folders.append(m)
+            except queue.Empty:
+                pass
             inst = ui.read_settings()
             if inst["plex_rescan"]:
                 for m in folders:
@@ -179,8 +188,9 @@ def _plex_worker():
                 plex(count)
             else:
                 log("plex selection off in UI, skipping")
-        except Exception as e:
-            log("post-processing: error " + str(e))
+        except Exception:
+            # the type alone is not enough: a KeyError prints just 'recent_min'
+            log("post-processing: error\n" + traceback.format_exc())
 
 
 def post_process(folder, count=1):
@@ -277,6 +287,6 @@ class H(BaseHTTPRequestHandler):
 
 
 ui.load_env()          # connections from settings.json -> os.environ
-ui.start_scheduler(log)    # the weekly check, scheduled here instead of in DSM
+ui.start_scheduler(log)    # the weekly check, scheduled here rather than by the host's own task scheduler
 log("listening on port " + str(PORT))
 ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()

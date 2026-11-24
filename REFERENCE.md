@@ -187,6 +187,13 @@ lines, the track number, the language, a note for the log, the mkvpropedit
 arguments, and the arguments that describe the flags as they were, which is
 what makes Undo work for the mkv side.
 
+`track_rules.py --selftest` checks the ranking against the cases that are easy
+to break: the order in Audio priority, the channel count and the codec rules on
+the audio side, and on the subtitle side the type ranking, a full track before a
+forced one, and the never and only gates. It needs no media and no library, runs
+in well under a second, and names the rule it caught. Run it after any change to
+the pickers, and add a case when the ranking changes.
+
 ### webhook_listener.py
 The container's main process. An HTTP server on 8899 that takes the webhook from
 Radarr/Sonarr, checks the file is under the media root, runs the flag script,
@@ -196,8 +203,8 @@ page (through ui.py) and runs the weekly scheduler thread.
 ### ui.py and app/static/
 The web page. `ui.py` is the backend - settings, the API, jobs, the queue, the
 undo journal, statistics, log reading, sign-in, and the per-account Plex
-profiles. The client lives in `app/static/app.html` (plus `login.html` and
-`blocked.html`) and is served with an ETag, so an edited page is picked up
+profiles. The client lives in `app/static/app.html` (plus `login.html`,
+`blocked.html` and `setup.html`) and is served with an ETag, so an edited page is picked up
 without a restart. Both live in the image, so changing them means a rebuild.
 
 The page avoids polling where it can. On the pages that show something live (Overview, Run, Log,
@@ -290,6 +297,10 @@ A `Removed Subs` folder beside the library, with one subfolder per job
 (`flaggarr_trashfiles`, `flaggarr_unwanted_language`). Both the root and the two
 names are settings. Each folder has its own `manifest.tsv` recording what was
 moved from where, and the library's own folder structure is preserved under it.
+The row is written before the file moves, and the file is line-buffered, so a job
+stopped from the Run page never leaves files in quarantine with no record of where
+they came from. A row whose move then failed is harmless: Restore sees the file is
+not there and drops the row.
 The two manifests do not have the same shape, the trash one carries a category
 column and the language one does not. The Cleanup page shows
 what is in there, can restore it (reads the manifest, moves files back, drops
@@ -381,7 +392,9 @@ covering exactly what it got through. One file per run and account, named
 arguments that describe the flags as they were, the Plex side the stream ids that
 were selected. General -> Undo lists the runs that changed something and puts one
 whole run back, using the right token per account. Journals of the last twelve
-runs are kept, a run can only be put back once, and imports are not journalled.
+runs are kept and imports are not journalled. A run that went back fully can only
+be put back once; one where something failed keeps its journal, so it can be tried
+again once the reason is gone, and the log line says what the first failure was.
 
 ## Logs
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # ui.py - the flaggarr web page, served by webhook_listener.py on port 8899.
-# Side menu: Overview, Languages, Run, Statistics, Log, Connections, General, About.
+# Side menu: Overview, Run, Statistics, Log, Media, Languages, Tracks, Cleanup,
+# Users, Automation, Connections, Security, General, About.
 #
 # The settings live in /config/settings.json and are the source of everything:
 #   - the listener reads them on every event (switches, times, margin)
@@ -8,8 +9,9 @@
 # When a key is missing DEFAULTS applies, which is exactly what the scripts had built in.
 #
 # Sign-in: optional. Without a password the page is open (home network). With a password
-# set (General -> Security) sign-in is required everywhere, and the webhook from
-# Radarr/Sonarr only answers direct calls - not through DSM's reverse proxy (X-Forwarded-For).
+# set (the Security page) sign-in is required everywhere. The webhook from
+# Radarr/Sonarr only answers calls that reach the container directly, password or
+# not: anything carrying X-Forwarded-For came through a proxy and is refused.
 
 import ipaddress
 import json
@@ -20,7 +22,7 @@ import subprocess
 import threading
 from datetime import datetime
 
-VERSION = "0.86.10.22"          # shown in the footer. Bumped on every change to ui.py/the listener.
+VERSION = "0.86.11"          # shown in the footer. Bumped on every delivered change, whatever file.
 
 # The program lives in the image (/app), everything this installation owns lives
 # in the mounted volume (/config): settings, logs, backups.
@@ -44,13 +46,17 @@ DEFAULTS = {
     "margin": 5,             # added to the number of files in the batch
     # languages - universal lists (ISO 639-2, space separated). The scripts get them via settings_env.py
     "native_langs": "eng",         # understood without text: an original in these -> no subtitle
+                                   # native_langs and same_sub_langs are derived from sub_rules by
+                                   # apply_sub_rules(); the scripts read these two, not sub_rules
     "same_sub_langs": "",          # text in the same language as the original
     "sub_langs": "eng",            # otherwise: first in the list that exists as a text track
     "audio_priority": "orig eng",       # the audio order; "orig" is the title's own language
     "audio_codec_rules": "",   # per-codec rules, e.g. truehd:prefer dtshd:avoid
     "import_url": "",                # the webhook address for Radarr/Sonarr, shown under Automation
-    "sub_rules": "eng:none",            # per spoken language: none (understood) or same (text in it);
-    "alt_tag": "",                      # titles carrying this Radarr/Sonarr tag follow the two lines below
+    "sub_rules": "eng:none",            # per spoken language: none (understood), same (text in it),
+                                        # a language code, "<code>+forced", or the reserved rows
+                                        # follow, never and skip
+    "alt_tag": "",                      # titles carrying this Radarr/Sonarr tag follow the alt_ rules below
     "alt_tag_radarr": True,             # where that tag is read from: Radarr (films) ...
     "alt_tag_sonarr": True,             # ... and Sonarr (series)
     "audio_map": "",                    # original language -> the language to hear instead, plus
@@ -58,10 +64,10 @@ DEFAULTS = {
                                         # Only used when the placeholder is out of audio_priority
     "alt_audio_priority": "eng orig",       # instead of audio_priority - dubbed animation, say
     "alt_sub_rules": "eng:none",        # instead of sub_rules; sub_langs is shared with the main set
-    "alt_audio_map": "",                # the tag rule's own per-language table
-                                       # a language with no rule here falls to sub_langs
-    # derived from sub_rules by apply_sub_rules() - the scripts read these
-    # the weekly check is run by the listener itself (no DSM task): weekday 0=Monday..6=Sunday, "HH:MM"
+    "alt_audio_map": "",                # the tag rule's own per-language table; a language with no
+                                        # row here falls to alt_audio_priority, then the title's own
+    # the weekly check is run by the listener itself, not by the host's scheduler:
+    # weekday 0=Monday..6=Sunday, "HH:MM"
     "weekly_on": True,
     "use_quarantine": True,                             # off: the cleanup jobs delete straight away
     "weekly_cleanup": False,                            # quarantine pass before the weekly flag run
@@ -86,8 +92,9 @@ DEFAULTS = {
     "sub_vobsub": "never",         # never | last | allowed | first  (DVD picture subs)
     "sub_ass": "never",            # never | last | allowed | first  (ASS/SSA styled subs)
     "sub_forced_mode": "nofull",   # nofull | native - forced subtitles also for a language you understand
-    "sub_track_order": "text forced",
-    "sub_track_display_order": "",   # UI only: the full row order incl. unticked rows, so ticking never moves a row  # the order in the UI; mirrored to the three keys above
+    "sub_track_order": "text forced",   # the order in the UI; apply_track_order() mirrors it to
+                                        # sub_sdh, sub_forced, sub_pgs, sub_vobsub and sub_ass
+    "sub_track_display_order": "",   # UI only: the full row order incl. unticked rows, so ticking never moves a row
     "mp4_plex_select": True,
     "m4v_plex_select": True,           # mp4/m4v: no flags can be written, but the Plex pick still runs
     "mov_plex_select": True,           # mov: no flags either, but the Plex pick still runs
@@ -140,12 +147,12 @@ JOBS = {
                "apply": ["sh", APP_DIR + "/run_unwanted_language_removal.sh", "apply"],
                "delete": ["sh", APP_DIR + "/run_unwanted_language_removal.sh", "delete"]},
               LOG_DIR + "/manual_unwanted_language_removal.log"),
-    "weekly": ("Set MKV flags — whole library",
+    "weekly": ("Set MKV flags - whole library",
                   "Goes through every file and writes the default audio and subtitle flags where they are missing or wrong. Same as the scheduled weekly check.",
                   {"dry": ["python3", APP_DIR + "/auto_mkv_defaultflags_batch.py", "--quiet"],
                    "apply": ["sh", APP_DIR + "/schedule_helper.sh"]},
                   LOG_DIR + "/ui_weekly.log"),
-    "plex": ("Set Plex selections — whole library",
+    "plex": ("Set Plex selections - whole library",
                 "Rewrites the saved audio and subtitle track in Plex for every title, not just recent ones. Dry run shows what would change.",
                 {"dry": ["python3", APP_DIR + "/auto_set_plex_defaults.py"],
                  "apply": ["python3", APP_DIR + "/auto_set_plex_defaults.py", "--apply"]},
@@ -279,19 +286,51 @@ def read_settings():
     return s
 
 
+# settings.json is there but will not parse: a write cut in half, a full disk, or
+# the wrong owner after a PUID change. Reading that as "no settings yet" is what
+# hurts - the page would hand out the first-run form with no password, and the
+# next save would write the file back with only the keys it was given, taking the
+# password, the connections and every profile with it. So the unreadable case is
+# remembered here, sign-in fails closed, and nothing is written until
+# config/RESET_PASSWORD moves the file aside.
+_unreadable = ""
+
+
 def _read_raw():
+    global _unreadable
     try:
         with open(SETTINGS) as f:
-            return json.load(f)
-    except (OSError, ValueError):
+            d = json.load(f)
+    except FileNotFoundError:
+        _unreadable = ""                   # first run: there is nothing to read yet
         return {}
+    except (OSError, ValueError) as exc:
+        _unreadable = "%s: %s" % (type(exc).__name__, exc)
+        return {}
+    _unreadable = ""
+    return d
+
+
+def settings_unreadable():
+    """Why settings.json could not be read, or "" when it is fine."""
+    _read_raw()
+    return _unreadable
 
 
 def save_settings(s):
+    """False when settings.json cannot be read: writing it back would keep only
+    the keys handed in here and lose the rest for good."""
     d = _read_raw()
+    if _unreadable:
+        return False
     d.update(s)
-    with open(SETTINGS, "w") as f:
+    tmp = SETTINGS + ".tmp"            # same directory, so os.replace is atomic
+    with open(tmp, "w") as f:
         json.dump(d, f, indent=2, ensure_ascii=False)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, SETTINGS)
+    return True
 
 
 # ---------- sign-in ----------
@@ -306,7 +345,10 @@ COOKIE_NAME = "flaggarr"
 
 
 def password_set():
-    return bool(_read_raw().get("password"))
+    d = _read_raw()
+    if _unreadable:
+        return True            # locked out beats wide open: no first-run form
+    return bool(d.get("password"))
 
 
 def _hash(pw, salt=None, it=200000):
@@ -354,6 +396,13 @@ def check_reset(log=None):
     RESET_PASSWORD is deleted afterwards."""
     if not os.path.exists(RESET_FILE):
         return
+    if settings_unreadable():          # the only way back in when the file is broken
+        try:
+            os.replace(SETTINGS, SETTINGS + ".broken")
+            if log:
+                log("UI: settings.json could not be read - moved to settings.json.broken")
+        except OSError:
+            pass
     reset_credentials(log, "config/RESET_PASSWORD")
     try:
         os.remove(RESET_FILE)
@@ -366,7 +415,7 @@ def _secret():
     if not d.get("secret"):
         save_settings({"secret": secrets.token_hex(32)})
         d = _read_raw()
-    return d["secret"]
+    return d.get("secret") or ""        # no secret, no valid cookie: closed, not open
 
 
 def _sig(exp):
@@ -658,7 +707,7 @@ def script_env(s=None):
         d[k.upper()] = str(s.get(k) or "")
         d[k.upper() + "_NAMES"] = names_from_codes(s.get(k) or "")
     if str(s.get("alt_tag") or "").strip():
-        d["FLAGGARR_TAG_MAP"] = write_tag_map()
+        d["FLAGGARR_TAG_MAP"], d["FLAGGARR_TAG_MAP_ERROR"] = write_tag_map()
     d.update({k: v for k, v in active_env().items() if v})
     return d
 
@@ -802,7 +851,7 @@ def test_connection(service, url=None, key_name=None):
         # Something answered, but not the program we asked for. Nearly always the port: an address
         # without one lands on whatever serves port 80. Say that, rather than the parser's own
         # exception name - "ParseError" tells nobody which door was knocked on.
-        wrong_door = {"ok": False, "info": "answered with %s, not %s - is the port right?" % (ctype, row[1])}
+        wrong_door = {"ok": False, "info": "answered with %s, not %s. Is the port right?" % (ctype, row[1])}
         if service == "plex":
             try:
                 root = ET.fromstring(body)
@@ -827,7 +876,9 @@ def test_connection(service, url=None, key_name=None):
     except urllib.error.URLError as e:
         return {"ok": False, "info": "cannot reach: " + str(getattr(e, "reason", e))}
     except Exception as e:
-        return {"ok": False, "info": "error: " + type(e).__name__}
+        # The type alone drops what helps: SSLCertVerificationError without its text
+        # does not say "hostname mismatch".
+        return {"ok": False, "info": "error: %s: %s" % (type(e).__name__, str(e)[:120])}
 
 
 # ---------- logs ----------
@@ -836,9 +887,13 @@ def _tail(p, n=15):
     try:
         with open(p, encoding="utf-8", errors="replace") as f:
             lines = f.read().splitlines()
-        return lines[-n:]
-    except OSError:
-        return []
+    except FileNotFoundError:
+        return []                          # nothing written yet is not an error
+    except OSError as exc:
+        # An empty Log page reads as "nothing happened", so the reason goes where the
+        # user is already looking rather than nowhere.
+        return ["ERROR could not read %s: %s" % (os.path.basename(p), exc)]
+    return lines[-n:]
 
 
 def _last_run(p, max_lines=600, tail=5000):
@@ -924,6 +979,11 @@ def _run_script(name, mode, log, extra=None):
     log("UI: starting %s" % jword)
     env = dict(os.environ)
     env.update(script_env())
+    if env.get("FLAGGARR_TAG_MAP_ERROR"):
+        # Without the map every tagged title is treated as untagged and written with the
+        # main rules - wrong work, not missing work, so the run must not read as clean.
+        log("UI: ERROR tag list could not be read (%s) - the tag rule is not in effect for %s"
+            % (env["FLAGGARR_TAG_MAP_ERROR"], jword))
     env["PYTHONUNBUFFERED"] = "1"          # child output arrives line by line, not in 8 kB chunks
     _rid = ""
     if mode == "apply" and name in ("weekly", "plex"):   # a real run keeps a journal, so it can be undone
@@ -993,8 +1053,10 @@ def _run_script(name, mode, log, extra=None):
                         _procs[name] = uproc
                     uproc.communicate()
                     u_rc = uproc.returncode
-            except Exception:
-                pass
+            except Exception as exc:
+                # u_rc stays -1 so the job reports FAILED; without this line nothing
+                # says which account it was or why.
+                log("UI: ERROR the pass for %s failed: %s: %s" % (uname, type(exc).__name__, exc))
             with _lock:
                 _procs.pop(name, None)
             if u_rc != 0 and rc == 0:
@@ -1176,7 +1238,7 @@ def _weekly_due(s, now=None):
 
 
 def start_scheduler(log):
-    """Thread that runs the weekly check (schedule_helper.sh) on the chosen weekday and time. Replaces the DSM task."""
+    """Thread that runs the weekly check (schedule_helper.sh) on the chosen weekday and time. Replaces the host's own task."""
     def _tick():
         while True:
             try:
@@ -1324,13 +1386,12 @@ def backup_list(n=5):
 
 
 def reset_settings():
-    """Defaults + English only as audio and text. Connections and sign-in are kept."""
-    old = {}
-    try:
-        with open(SETTINGS) as f:
-            old = json.load(f)
-    except (OSError, ValueError):
-        pass
+    """Defaults + English only as audio and text. Connections and sign-in are kept.
+    False when the old file cannot be read: carrying those three keys over is the
+    whole promise, and an unreadable file would silently break it."""
+    old = _read_raw()
+    if _unreadable:
+        return False
     ny = dict(DEFAULTS)
     ny.update(ENGLISH_ONLY)
     for k in ("connections", "password", "secret"):
@@ -1338,18 +1399,23 @@ def reset_settings():
             ny[k] = old[k]
     with open(SETTINGS, "w") as f:
         json.dump(ny, f, indent=2, ensure_ascii=False)
+    return True
 
 
 def reset_everything(log=None):
     """Back to a clean slate: the preferences, the connections and the sign-in all go.
     A backup is written first, so the old settings are never lost for good.
-    A fresh random password for admin ends up in config/NEW_PASSWORD.txt."""
-    make_backup()
+    A fresh random password for admin ends up in config/NEW_PASSWORD.txt.
+    False when the backup could not be written: the docstring above is a promise,
+    so nothing is thrown away when it cannot be kept."""
+    if not make_backup():
+        return False
     ny = dict(DEFAULTS)
     ny.update(ENGLISH_ONLY)
     with open(SETTINGS, "w") as f:
         json.dump(ny, f, indent=2, ensure_ascii=False)
     reset_credentials(log, "Reset everything")
+    return True
     clear_logs("all")
     return True
 
@@ -1380,7 +1446,8 @@ def restore_backup(name):
         return False
     if not isinstance(data, dict):
         return False
-    make_backup()
+    if not make_backup():
+        return False                  # the settings in use are the only copy left
     try:
         with open(SETTINGS, "w") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
@@ -1389,20 +1456,28 @@ def restore_backup(name):
     return True
 
 def clear_quarantine(folder):
-    """Deletes everything in a quarantine folder permanently (only under QUARANTINE). Returns the number of files."""
+    """Deletes everything in a quarantine folder permanently (only under QUARANTINE).
+    Returns (number of files, error message)."""
     if not folder or "/" in folder or folder in (".", ".."):
-        return 0
+        return 0, ""
     import shutil
     root = os.path.join(QUARANTINE_(), folder)
     if not os.path.isdir(root):
-        return 0
+        return 0, ""
     n = 0
     for r, dirs, files in os.walk(root):
         n += len(files)
-    shutil.rmtree(root)
+    try:
+        shutil.rmtree(root)
+    except OSError as exc:
+        # Half of it may be gone, the manifest included, which would leave real files
+        # in quarantine that nothing can restore. Say so rather than answer nothing:
+        # an exception here never reaches a response at all.
+        os.makedirs(root, exist_ok=True)
+        return n, "could not empty quarantine/%s: %s" % (folder, exc)
     os.makedirs(root, exist_ok=True)
     _mkv_cache["count"] = None
-    return n
+    return n, ""
 
 
 def _quarantine_manifest_row(cols):
@@ -1421,18 +1496,20 @@ def restore_quarantine(folder):
     manifest. Rows already permanently deleted (dest == DELETED) have nothing to move
     and are left alone. A restored or now-missing row is dropped from the manifest;
     a row whose original path is occupied again is kept, so nothing is silently lost.
-    Returns (restored, missing, conflicts)."""
+    Returns (restored, missing, conflicts, errors); errors are rows that could not be
+    moved back, which is a different thing from a conflict."""
     if not folder or "/" in folder or folder in (".", ".."):
-        return 0, 0, 0
+        return 0, 0, 0, []
     import shutil
     root = os.path.join(QUARANTINE_(), folder)
     manifest_path = os.path.join(root, "manifest.tsv")
     if not os.path.isfile(manifest_path):
-        return 0, 0, 0
+        return 0, 0, 0, []
     with open(manifest_path, encoding="utf-8", errors="replace") as f:
         rows = [r.rstrip("\n") for r in f if r.strip()]
     keep = []
     restored = missing = conflicts = 0
+    errors = []
     for row in rows:
         parsed = _quarantine_manifest_row(row.split("\t"))
         if not parsed:
@@ -1453,13 +1530,15 @@ def restore_quarantine(folder):
             os.makedirs(os.path.dirname(orig), exist_ok=True)
             shutil.move(dest, orig)
             restored += 1
-        except OSError:
-            conflicts += 1
+        except OSError as exc:
+            # Not a conflict: the UI says "skipped (already exist)" for those, and the
+            # file it names would not be there to find.
+            errors.append("%s: %s" % (orig, exc))
             keep.append(row)
     with open(manifest_path, "w", encoding="utf-8") as f:
         f.write("\n".join(keep) + ("\n" if keep else ""))
     _mkv_cache["count"] = None
-    return restored, missing, conflicts
+    return restored, missing, conflicts, errors
 
 
 def quarantine_files(folder):
@@ -1492,7 +1571,7 @@ def quarantine_files(folder):
     out.sort(key=lambda r: r["path"])
     return out
 _OK = re.compile(r"^OK \(([^)]+)\)")
-_MOVED = re.compile(r"(Moved|Deleted|Flyttade|Raderade) (\d+) files")   # English since v1.32, Swedish before that
+_MOVED = re.compile(r"(Moved|Deleted|Flyttade|Raderade) (\d+) files")   # the scripts print English; the Swedish words are there for logs written before they did
 
 
 def _all_entries(file):
@@ -1583,7 +1662,7 @@ def arr_tags(sources=("radarr", "sonarr")):
     out.sort(key=str.lower)
     return out
 
-_tagmap_cache = {"ts": 0.0, "data": None}
+_tagmap_cache = {"ts": 0.0, "data": None, "err": ""}
 
 
 def arr_tag_map(sources=("radarr", "sonarr")):
@@ -1618,9 +1697,15 @@ def arr_tag_map(sources=("radarr", "sonarr")):
                         names = [labels[x] for x in (it.get("tags") or []) if labels.get(x)]
                         if folder and names:
                             per[src][folder] = names
-            except Exception:
-                pass
-        _tagmap_cache.update({"ts": time.time(), "data": per})
+            except Exception as exc:
+                per[src] = None                   # not "no tags": unknown
+                _tagmap_cache["err"] = "%s: %s" % (src, exc)
+        # A source that could not be read is left as None and the cache is given an old
+        # timestamp, so the next run asks again instead of treating every title as
+        # untagged for ten minutes - which would write the main rules over the tagged
+        # set and report it as a clean run.
+        failed = any(v is None for v in per.values())
+        _tagmap_cache.update({"ts": 0 if failed else time.time(), "data": per})
     out = {}
     for src in sources:
         for folder, names in (_tagmap_cache["data"].get(src) or {}).items():
@@ -1630,16 +1715,21 @@ def arr_tag_map(sources=("radarr", "sonarr")):
 
 def write_tag_map():
     """The map as a file, since the scripts run as separate processes. Built only from the
-    arrs ticked under Tag list -> Use from."""
+    arrs ticked under Tag list -> Use from. Returns (path, error); an empty path means the
+    tag rule is not in effect for this run, which the caller has to report."""
     s = read_settings()
     sources = [x for x in ("radarr", "sonarr") if s.get("alt_tag_" + x, True)]
     p = os.path.join(CONFIG_DIR, "tag_map.json")
+    _tagmap_cache["err"] = ""
+    m = arr_tag_map(sources)
+    if _tagmap_cache.get("err"):
+        return "", _tagmap_cache["err"]
     try:
         with open(p, "w", encoding="utf-8") as f:
-            json.dump(arr_tag_map(sources), f, ensure_ascii=False)
-    except OSError:
-        return ""
-    return p
+            json.dump(m, f, ensure_ascii=False)
+    except OSError as exc:
+        return "", "tag_map.json: %s" % exc
+    return p, ""
 
 
 def statistics(listener_log):
@@ -2290,7 +2380,7 @@ def undo_run(rid, log):
                 pass
         with _lock:
             _undo["total"] = len(items)
-        failed = 0
+        failed, first_err = 0, ""
         for ext, uid, r in items:
             ok = False
             try:
@@ -2311,18 +2401,29 @@ def undo_run(rid, log):
                         req = urllib.request.Request(url, method="PUT")
                         with urllib.request.urlopen(req, timeout=60) as resp:
                             ok = 200 <= resp.status < 300
-            except Exception:
+            except Exception as exc:
                 ok = False
+                first_err = first_err or "%s: %s" % (type(exc).__name__, exc)
             if not ok:
                 failed += 1
+                # Plex switched off under Connections leaves base and token empty, so no
+                # request is sent at all and every row "fails" without raising.
+                first_err = first_err or ("plex is switched off or has no token"
+                                          if ext != "tsv" and not (base and tokens.get(uid)) else "")
             with _lock:
                 _undo["done"] += 1
                 _undo["failed"] = failed
-        for f in files:                                   # a run can only be put back once
-            try:
-                os.remove(os.path.join(UNDO_DIR, f))
-            except OSError:
-                pass
+        if failed:
+            # The journal is the only record of what the run changed. Throwing it away
+            # after a failed undo would leave nothing to try again with, so it stays.
+            log("UI: undo of the run from %s kept - %d of %d could not be put back (%s)"
+                % (rid, failed, len(items), first_err or "no reason given"))
+        else:
+            for f in files:                               # a run that is back can only be put back once
+                try:
+                    os.remove(os.path.join(UNDO_DIR, f))
+                except OSError:
+                    pass
         with _lock:
             _undo.update({"running": False, "finished": datetime.now().strftime("%Y-%m-%d %H:%M")})
         log("UI: undo of the run from %s done - %d put back, %d failed" % (rid, len(items) - failed, failed))
@@ -2518,7 +2619,7 @@ def mkv_check(path):
                 "owner": "%s:%s" % (_name(lambda i: pwd.getpwuid(i).pw_name, st_.st_uid), _name(lambda i: grp.getgrgid(i).gr_name, st_.st_gid)),
                 "account": _name(lambda i: pwd.getpwuid(i).pw_name, me),
                 "readable": os.access(path, os.R_OK)})
-    # A real open for writing, closed again at once: the mode bits say little on a Synology share, where an ACL
+    # A real open for writing, closed again at once: the mode bits say little on a network share, where an ACL
     # or the DOS read-only attribute can still refuse the write. Nothing is written.
     try:
         os.close(os.open(path, os.O_RDWR))
@@ -2533,7 +2634,8 @@ def mkv_check(path):
             return -1, "timed out after %d s" % secs
         except OSError as e:
             return -1, str(e)
-    # Short limits: the answer has to be back before DSM's reverse proxy gives up on the request.
+    # Short limits: the answer has to be back before a reverse proxy in front of the
+    # container gives up on the request.
     rc1, ident = run(["mkvmerge", "--command-line-charset", "UTF-8", "--output-charset", "UTF-8", "-i", path], 20)
     rc2, info = run(["mkvinfo", "--command-line-charset", "UTF-8", "--output-charset", "UTF-8", path], 20) if rc1 != -1 else (-1, "not run - mkvmerge already stalled")
     out.update({"identify": ident[-3000:], "identify_rc": rc1, "info": info[-4000:], "info_rc": rc2})
@@ -2541,7 +2643,7 @@ def mkv_check(path):
     if not out["readable"]:
         v = who + " cannot read the file."
     elif not out["writable"]:
-        v = who + " cannot open the file for writing: " + out["write_error"] + ". " + ("The mode allows it, so the share refuses it - a Synology ACL or the file's read-only attribute. In File Station: Properties -> Permission for the account, and untick Read-only under General." if out["mode"] == "777" else "Give it write access on the NAS: chown or chmod, or the shared folder's permissions with 'Apply to this folder, sub-folders and files'.")
+        v = who + " cannot open the file for writing: " + out["write_error"] + ". " + ("The mode allows it, so the share refuses it - an ACL on the share, or the file's read-only attribute. Check the folder's permissions for this account, and the file's read-only flag." if out["mode"] == "777" else "Give it write access on the host: chown or chmod, or the shared folder's permissions, applied to the folder and everything under it.")
     elif rc1 == -1 or rc2 == -1:
         v = "Reading the file stalls - it is damaged, or the disk has trouble reading it. Get the file again, and check the drive's health in Storage Manager if it happens to more files."
     elif rc1 != 0 or rc2 != 0:
@@ -2706,7 +2808,7 @@ def handle_get(h, listener_log, start_time):
         h.send_response(200)
         h.send_header("Content-Type", "text/event-stream; charset=utf-8")
         h.send_header("Cache-Control", "no-cache")
-        h.send_header("X-Accel-Buffering", "no")     # DSM's reverse proxy must pass it through unbuffered
+        h.send_header("X-Accel-Buffering", "no")     # an nginx in front of us must pass it through unbuffered
         h.end_headers()
         last, ticks = None, 0
         try:
@@ -2968,23 +3070,29 @@ def handle_post(h, body, log):
         log("UI: logs cleared (%s, %d files)" % (_w, n))
         reply = {"ok": True, "n": n}
     elif p == "/api/quarantine_clear":
-        n = clear_quarantine(str(data.get("folder", "")))
-        log("UI: quarantine %s emptied permanently (%d files)" % (data.get("folder"), n))
-        reply = {"ok": True, "count": n}
+        n, err = clear_quarantine(str(data.get("folder", "")))
+        log("UI: quarantine %s emptied permanently (%d files)%s"
+            % (data.get("folder"), n, " - " + err if err else ""))
+        reply = {"ok": not err, "count": n, "msg": err}
     elif p == "/api/test":
         reply = test_connection(str(data.get("service", "")), data.get("url"), data.get("key"))
     elif p == "/api/backup":
         name = make_backup()
         reply = {"ok": bool(name), "name": name}
     elif p == "/api/reset":
-        make_backup()
-        reset_settings()
-        log("UI: settings reset to defaults (English only)")
-        reply = {"ok": True}
+        if not make_backup():
+            reply = {"ok": False, "msg": "could not write a backup to config/backup - nothing was reset"}
+        elif not reset_settings():
+            reply = {"ok": False, "msg": "settings.json could not be read - nothing was reset"}
+        else:
+            log("UI: settings reset to defaults (English only)")
+            reply = {"ok": True}
     elif p == "/api/reset_everything":
-        reset_everything(log)
-        log("UI: everything reset - preferences, connections and sign-in")
-        reply = {"ok": True}
+        if not reset_everything(log):
+            reply = {"ok": False, "msg": "could not write a backup to config/backup - nothing was reset"}
+        else:
+            log("UI: everything reset - preferences, connections and sign-in")
+            reply = {"ok": True}
     elif p == "/api/backup_delete":
         name = str(data.get("file", ""))
         ok = delete_backup(name)
@@ -3022,9 +3130,11 @@ def handle_post(h, body, log):
         reply = {"ok": ok, "msg": msg}
     elif p == "/api/quarantine_restore":
         folder = str(data.get("folder", ""))
-        restored, missing, conflicts = restore_quarantine(folder)
-        log("UI: quarantine %s restored (%d files, %d missing, %d conflicts)" % (folder, restored, missing, conflicts))
-        reply = {"ok": True, "restored": restored, "missing": missing, "conflicts": conflicts}
+        restored, missing, conflicts, errs = restore_quarantine(folder)
+        log("UI: quarantine %s restored (%d files, %d missing, %d conflicts%s)"
+            % (folder, restored, missing, conflicts, ", %d failed: %s" % (len(errs), errs[0]) if errs else ""))
+        reply = {"ok": True, "restored": restored, "missing": missing, "conflicts": conflicts,
+                 "failed": len(errs), "error": errs[0] if errs else ""}
     else:
         reply = {"ok": False, "msg": "unknown address"}
     _json(h, reply, set_cookie)

@@ -57,7 +57,7 @@ SUB_LANGS="${SUB_LANGS:-swe eng}"    # otherwise, in order
 # transcoding. PGS and VobSub are bitmaps and are always cleared.
 # To allow ASS anyway: add |SubStationAlpha below.
 SUB_CODECS="SubRip|SRT"
-SUB_SDH="${SUB_SDH:-never}"          # never | last | allowed | first   (UI: Subtitles -> Subtitle types)
+SUB_SDH="${SUB_SDH:-never}"          # never | last | allowed | first   (UI: Tracks -> Subtitle types)
 SUB_FORCED="${SUB_FORCED:-last}"    # never | last | allowed | first
 SUB_PGS="${SUB_PGS:-never}"         # never | last | allowed | first  (Blu-ray picture subs)
 SUB_VOBSUB="${SUB_VOBSUB:-never}"   # never | last | allowed | first  (DVD picture subs)
@@ -67,7 +67,7 @@ SUB_ASS="${SUB_ASS:-never}"         # never | last | allowed | first  (ASS/SSA s
 # the same rank the SUB_LANGS order applies. The flags on the tracks themselves
 # are left untouched.
 
-# Synology: MKVToolNix lives in /usr/local/bin, which is not always in PATH
+# Some hosts keep MKVToolNix in /usr/local/bin, which is not always in PATH
 # for the service user (sc-sonarr / sc-radarr).
 PATH="/usr/local/bin:/opt/bin:$PATH"
 export PATH
@@ -185,7 +185,7 @@ else
   log "ERROR: mkvpropedit: ${mkv_msg:-no output}"
   # The usual two causes read the same in mkvpropedit's message, so say which it was.
   if [ ! -w "$file" ]; then
-    log "  cause: no write access for $(id -un) - owner $(stat -c '%U:%G, mode %a' "$file" 2>/dev/null). Give the account write access on the NAS."
+    log "  cause: no write access for $(id -un) - owner $(stat -c '%U:%G, mode %a' "$file" 2>/dev/null). Give the account write access on the host."
   elif [ ! -r "$file" ]; then
     log "  cause: no read access for $(id -un) - owner $(stat -c '%U:%G, mode %a' "$file" 2>/dev/null)."
   else

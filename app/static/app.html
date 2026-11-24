@@ -722,14 +722,26 @@ function qm(desc){if(!desc)return "";QTXT.push(desc);return '<button type="butto
 function sw(k,title,desc){const m=title.match(/^(\d) · (.*)$/); if(m)title='<span class="num">'+m[1]+'</span>'+m[2];
   return '<div class="row"><div class="v"><b>'+title+qm(desc)+'</b></div><label class="sw"><input type="checkbox" data-k="'+k+'" '+(st.settings[k]?'checked':'')+'><i></i></label></div>'}
 function swCheck(k,title,desc){return '<label><input type="checkbox" data-k="'+k+'" '+(st.settings[k]?'checked':'')+'><span><b>'+title+qm(desc)+'</b></span></label>';}
+/* A save that fails has to say so. Each of the calls below used to sit in an empty
+   catch, so a dropped connection or a 500 looked exactly like success: the switch
+   stayed where it was put, and the next load() quietly drew the old state back.
+   Returns the parsed answer, or null once the reason has been shown. */
+async function post(url,body){
+ try{
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+  let j={}; try{j=await r.json()}catch(e){j={ok:r.ok}}
+  if(!r.ok||j.ok===false)throw new Error(j.msg||('the server answered '+r.status));
+  return j;
+ }catch(e){modal('Could not save','<p class="hint" style="margin:0">'+esc(String(e.message||e))+'</p>'); return null}
+}
 function modal(title,html,foot){const m=document.createElement("div"); m.className="modalBack"; m.innerHTML='<div class="modal"><header><span>'+title+'</span><button type="button" data-close>&times;</button></header><div class="kropp">'+html+'</div>'+(foot?'<footer>'+foot+'</footer>':'')+'</div>';
   m.addEventListener("click",e=>{if(e.target===m||e.target.closest("[data-close]"))m.remove()}); document.body.appendChild(m); return m}
 function confirmBox(title,html,buttonText,cb,cls){const m=modal(title,html,'<span></span><div style="display:flex;gap:10px"><button type="button" data-close>Cancel</button><button type="button" class="'+(cls===undefined?"danger":cls)+'" id="__confirm">'+buttonText+'</button></div>');
   m.querySelector("#__confirm").addEventListener("click",()=>{m.remove();cb()}); return m}
-const ORIG="orig";
+const ORIG="orig";   // the language-list row that stands for the title's own language (track_rules.ORIGINAL)
 const FOLLOW="follow";   // reserved in sub_rules: the text follows the audio
 const NEVER="never";   // reserved in sub_rules: no subtitle at all, whatever is spoken
-const PLEX="skip";   // reserved in both fields: this set is not ours to write   // the language-list row that stands for the title's own language (track_rules.ORIGINAL)
+const PLEX="skip";   // reserved in both fields: this set is not ours to write
 function langName(v){if(v===ORIG)return "Title original language"; const l=st.languages.find(x=>x[0]===v||x[1]===v); return l?l[0][0].toUpperCase()+l[0].slice(1):v}
 function undoBox(){
   const u=(st&&st.undo)||[], s=(st&&st.undo_status)||{};
@@ -1513,7 +1525,7 @@ async function gqApply(){await gstate(); let body={id:st.me.id,enabled:false}; i
  {const u=((users&&users.users)||[]).find(x=>String(x.id)===String(st.me.id)); gqCancelable=gqPick.profile!=='on'&&!!(u&&u.own)}
  if(gqPick.profile==='on'){gqCollect(); body=Object.assign({id:st.me.id,enabled:true},gqDraft)}
  if(gqPick.profile==='on'&&gqPick.tune==='yes'){gqShow=false; gqOpen=false; gqSaved=false; lastHtml=null; drawn=null; draw(); return}   /* Fine-tune: nothing is saved yet - the guide's own Save does it, so Cancel leaves no trace */
- try{await fetch('/api/user_profile',{method:'POST',body:JSON.stringify(body)})}catch(x){}
+ await post('/api/user_profile',body);
  gqSaved=gqPick.profile==='on'&&gqPick.tune!=='yes';
  gqShow=false; gqOpen=false; users=null; lastHtml=null;
  if(gqSaved){thanksFrom('answers'); goHash('#thanks'); return}   // happy with the answers: straight to the thank-you page
@@ -1544,7 +1556,7 @@ document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest
 function gqHome(u){const saved=st.settings; st.settings=Object.assign({},saved,u.profile); const h=ruleBox(); st.settings=saved;
  return '<div class="ghome">'+GNOTE('Your settings are saved','Plex follows your answers. Change them whenever you like.')+'<div class="ghsum"'+(gqSumOpen?'':' hidden')+'>'+h.replace('class="ruleBox"','class="ruleBox sweep"')+'</div>'
   +'<div class="btnfoot ghbtns left"><button type="button" class="btn-sm" data-gopen>Start over</button>'+(gqSumOpen?'':'<button type="button" class="btn-sm" data-gsumtoggle>View summary</button>')+'<span class="push"><button type="button" class="btn-sm" data-gtune>Fine-tune</button><button type="button" class="btn-sm prim" data-gfin>Finish</button></span></div></div>'}
-document.addEventListener('click',async e=>{if(!(e.target.closest&&e.target.closest('#main [data-gcancel]')))return; await gstate(); try{await fetch('/api/user_profile',{method:'POST',body:JSON.stringify({id:st.me.id,enabled:true})})}catch(x){} gqCancelable=false; users=null; lastHtml=null; loadUsers()});   // back to the answers as they were
+document.addEventListener('click',async e=>{if(!(e.target.closest&&e.target.closest('#main [data-gcancel]')))return; await gstate(); await post('/api/user_profile',{id:st.me.id,enabled:true}); gqCancelable=false; users=null; lastHtml=null; loadUsers()});   // back to the answers as they were
 let gqSumOpen=false;   // the home screen keeps the summary behind a button
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('#main [data-gsumtoggle]'); if(!b)return; gqSumOpen=true; const d=$('#main .ghsum'); if(d)d.hidden=false; b.remove()});   // once open the summary stays - there is no Hide
 function gqDone(u){const saved=st.settings; st.settings=Object.assign({},saved,u.profile); const h=ruleBox(); st.settings=saved;
@@ -1725,7 +1737,7 @@ function connCard(t){
   const off=t.enabled===false, noaddr=!!(r&&r.info==="no address");
   return '<section class="'+(off?"offconn":"")+'"><h2><span style="display:flex;align-items:center;gap:8px">'+icon(t)+esc(t.label)+'</span>'+(off?'<span class="pill">Switched off</span>':(r?'<span class="pill '+(r.ok?"on":"off")+'">'+(r.ok?"Connected":"Not connected")+'</span>':""))+(t.id==="plex"?mech("plex"):"")+'</h2>'
    +'<div class="row"><div class="v"><b>Enabled</b><small>When this is off flaggarr behaves as if the connection had never been filled in: '+OFFNOTE[t.id]+'. The address and the key are kept, and Test still works, so it can be switched back on without typing them again.</small></div><label class="sw"><input type="checkbox" data-cen="'+t.id+'"'+(off?"":" checked")+'><i></i></label></div>'
-   +'<div class="row"><div class="v"><b>Host</b></div><div class="field"><input type="text" data-cu="'+t.id+'" data-schema="'+esc(u.schema)+'" value="'+esc(u.host)+'" placeholder="192.168.1.20"><span class="kolon">:</span><input type="number" min="1" max="65535" data-cp="'+t.id+'" value="'+esc(u.port)+'" placeholder="'+dflt+'" title="Port"></div></div>'
+   +'<div class="row"><div class="v"><b>Host</b></div><div class="field"><input type="text" data-cu="'+t.id+'" data-schema="'+esc(u.schema)+'" value="'+esc(u.host)+'" placeholder="your-server"><span class="kolon">:</span><input type="number" min="1" max="65535" data-cp="'+t.id+'" value="'+esc(u.port)+'" placeholder="'+dflt+'" title="Port"></div></div>'
    +'<div class="row"><div class="v"><b>'+keyOf+'</b> <span class="qmark" title="'+(t.id==="plex"?'Plex Web → any item → ⋯ → Get Info → View XML → X-Plex-Token in the address bar':esc(t.label)+' → Settings → General → Security → API Key')+'">?</span></div><div class="secret"><input type="password" id="ck_'+t.id+'" data-ck="'+t.id+'" value="'+esc(t.key)+'" autocomplete="off">'+eyeBtn("ck_"+t.id)+'</div></div>'
    +'<div class="testRow"><span style="flex:1"></span><span class="testsvar '+(r&&!noaddr?(r.ok?'ok':'error'):'')+'" id="testsvar">'+(r&&!noaddr?infoHtml(r.info):'')+'</span><span class="saved" id="saved"></span>'
    +'<button type="button" data-test="'+t.id+'"'+(u.host?'':' disabled')+'>Test</button><button class="prim" data-save-conn="'+t.id+'"'+(u.host?'':' disabled')+'>Save</button></div></section>';
@@ -1784,7 +1796,7 @@ async function qsSave(){const langs=qsLangs(), l=langs.join(' ');
  const d={audio_priority:(qsPick.aud==='orig'?'orig '+l:l+' orig').trim(), audio_map:'',
    sub_rules:(qsPick.sub==='never'?NEVER:FOLLOW)+':none', sub_langs:l,
    sub_track_order:'text'+(qsPick.sdh==='allowed'?' sdh':'')+(qsPick.forced!=='never'?' forced':''), sub_forced_mode:'nofull', quickstart_done:true};   // the shape the guest questions save too - sub_sdh/sub_forced are derived from it on every save
- try{await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)})}catch(e){}
+ await post('/api/settings',d);
  page='overview'; location.hash='#overview'; drawn=null; await load()}
 document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-qsv],[data-qstep],[data-qnav],[data-qskip]'); if(!t)return;
  if(t.dataset.qsv!==undefined){const kind=t.closest('[data-qs]').dataset.qs; qsPick[kind]=t.dataset.qsv;
@@ -2078,7 +2090,7 @@ async function save(){
   if(st&&st.me){                                  // a guest saves their own profile, nothing else
     const sec=document.querySelector("section[data-uid]"); if(!sec)return;
     const d=userValue(sec); d.id=st.me.id; d.enabled=true; if(gqDraft)Object.keys(gqDraft).forEach(k=>{if(!(k in d))d[k]=gqDraft[k]});   /* answers the guide has no field for (hearing, forced) come along from the questions */
-    try{await fetch("/api/user_profile",{method:"POST",body:JSON.stringify(d)})}catch(x){}
+    await post("/api/user_profile",d);
     const uo=((users&&users.users)||[]).find(x=>x.id===st.me.id);
     if(uo){uo.enabled=true; Object.keys(d).forEach(k=>{if(uo.profile&&(k in uo.profile))uo.profile[k]=d[k]})}
     lastHtml=null; drawn=null; draw();
@@ -2198,11 +2210,11 @@ document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest
 document.addEventListener("change",e=>{const p=e.target.closest&&e.target.closest(".cxList"); if(!p)return; if(e.target.classList.contains("cxin"))codecAdd(p,e.target); else checkDirty()});
 document.addEventListener("change",async e=>{const c=e.target.closest&&e.target.closest("input[data-uen]"); if(!c)return;
  c.disabled=true;
- try{await fetch("/api/user_profile",{method:"POST",body:JSON.stringify({id:c.dataset.uen,enabled:c.checked})})}catch(x){}
+ await post("/api/user_profile",{id:c.dataset.uen,enabled:c.checked});
  users=null; lastHtml=null; loadUsers()});
 document.addEventListener("change",e=>{const c=e.target.closest&&e.target.closest("input[data-uadv]"); if(!c)return; const b=document.getElementById("uadvBody"); if(!b)return; const clean=!isDirty(); fold(b,c.checked,{slide:true}).then(()=>{if(clean)ubaseline=uval(); checkDirty()})});   // the guest's Advanced mode slides open and shut like the other folds
 document.addEventListener("click",async e=>{const b=e.target.closest&&e.target.closest("button[data-uch]"); if(!b||b.classList.contains("sel"))return; const sec=b.closest("section[data-uid]"); if(!sec)return; b.disabled=true;
- try{await fetch("/api/user_profile",{method:"POST",body:JSON.stringify({id:sec.dataset.uid,enabled:b.dataset.uch==="on"})})}catch(x){}
+ await post("/api/user_profile",{id:sec.dataset.uid,enabled:b.dataset.uch==="on"});
  users=null; lastHtml=null; loadUsers()});
 document.addEventListener("change",e=>{if(st&&st.me&&e.target.closest&&e.target.closest("section[data-uid]"))checkDirty()});
 document.addEventListener("input",e=>{if(st&&st.me&&e.target.closest&&e.target.closest("section[data-uid]"))checkDirty()});
@@ -2215,7 +2227,7 @@ document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest
  const uid=String(b.dataset.ureset), row=((users&&users.users)||[]).find(x=>String(x.id)===uid)||{};
  confirmBox("Reset "+esc(row.name||"this account")+" to your global settings?",
    '<p class="hint" style="margin:0">Languages, subtitles, subtitle types and codec rules go back to what you set under Languages and Tracks, and follow your changes from now on.</p><p class="warning"><b>Warning:</b> this cannot be undone here. '+esc(row.name||"The account")+'\u2019s own settings are gone for good, and flaggarr does not tell the account.</p>',
-   "Reset", async()=>{try{await fetch("/api/user_profile",{method:"POST",body:JSON.stringify({id:uid,enabled:false,reset:true})})}catch(x){}
+   "Reset", async()=>{await post("/api/user_profile",{id:uid,enabled:false,reset:true});
      uedit.delete(uid); users=null; drawn=null; lastHtml=null; loadUsers()});
 });
 /* Statistics: the three tabs, and the search and sort over the import list. */
@@ -2228,14 +2240,14 @@ document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest
  const rows=((users&&users.users)||[]); if(!rows.length)return;
  confirmBox("Reset all accounts to your global settings?",
    '<p class="hint" style="margin:0">All '+rows.length+' accounts drop their own languages, subtitles, subtitle types and codec rules - also the ones the accounts saved themselves - and follow what you set under Languages and Tracks from now on. Each card then says <b>reset by admin</b>.</p><p class="warning"><b>Warning:</b> this cannot be undone here. Every account\u2019s own settings are gone for good, and flaggarr does not tell them.</p>',
-   "Reset all", async()=>{for(const x of rows){try{await fetch("/api/user_profile",{method:"POST",body:JSON.stringify({id:String(x.id),enabled:false,reset:true})})}catch(e_){}}
+   "Reset all", async()=>{for(const x of rows){await post("/api/user_profile",{id:String(x.id),enabled:false,reset:true})}
      uedit.clear(); users=null; drawn=null; lastHtml=null; loadUsers()});
 });
 document.addEventListener("click",async e=>{const b=e.target.closest&&e.target.closest("button[data-usave]"); if(!b)return;
  const sec=b.closest("section[data-uid]")||document.querySelector('section[data-uid="'+b.dataset.usave+'"]'); if(!sec)return; const d=userValue(sec); d.id=b.dataset.usave; d.enabled=true;
  const uid=String(d.id), wait=ms=>new Promise(z=>setTimeout(z,ms));
  b.disabled=true; b.textContent='Saving \u2026';   // save first, then fold Settings away, then lock
- let r=null; try{r=await (await fetch("/api/user_profile",{method:"POST",body:JSON.stringify(d)})).json()}catch(x){}
+ const r=await post("/api/user_profile",d);
  if(!(r&&r.ok)){b.disabled=false; b.textContent='Save & lock'; modal('Could not save','<p class="hint" style="margin:0">'+esc((r&&r.msg)||'No answer from the server.')+' Nothing changed for this account; your changes are still on the card.</p>'); return}
  b.textContent='Saved'; await wait(500);
  await ufold(uid,false);
@@ -2270,10 +2282,10 @@ document.addEventListener("click",async e=>{
   const rs=e.target.closest("[data-restore]"); if(rs){const m=rs.dataset.restore; rs.disabled=true;
     const r=await (await fetch("/api/quarantine_restore",{method:"POST",body:JSON.stringify({folder:m})})).json();
     stats=null; loadStats();
-    modal("Restored quarantine/"+m,'<p class="hint" style="margin:0">'+r.restored+' file'+(r.restored===1?"":"s")+' restored'+(r.missing?", "+r.missing+" missing":"")+(r.conflicts?", "+r.conflicts+" skipped (already exist)":"")+'.</p>','<button type="button" data-close>OK</button>'); return}
+    modal("Restored quarantine/"+m,'<p class="hint" style="margin:0">'+r.restored+' file'+(r.restored===1?"":"s")+' restored'+(r.missing?", "+r.missing+" missing":"")+(r.conflicts?", "+r.conflicts+" skipped (already exist)":"")+(r.failed?", "+r.failed+" could not be moved back: "+esc(r.error):"")+'.</p>','<button type="button" data-close>OK</button>'); return}
   const rk=e.target.closest("[data-clear]"); if(rk){const m=rk.dataset.clear;
     confirmBox("Empty quarantine/"+m+"?",'<p class="hint" style="margin:0">flaggarr deletes everything in <b>quarantine/'+esc(m)+'</b> for good, including the manifest that says where each file came from. There is no way back after this.</p>',"Delete for good",async()=>{
-      const r=await (await fetch("/api/quarantine_clear",{method:"POST",body:JSON.stringify({folder:m})})).json(); if(!r.ok)alert(r.msg); stats=null; loadStats()}); return}
+      await post("/api/quarantine_clear",{folder:m}); stats=null; loadStats()}); return}
   const qf=e.target.closest("[data-qfiles]"); if(qf){const m=qf.dataset.qfiles;
     const r=await (await fetch("/api/quarantine_files?folder="+encodeURIComponent(m))).json();
     const rows=(r.files||[]).map(f=>{const p=String(f.path||""),i=p.lastIndexOf("/");return '<div class="qfrow"><div class="qfp"><div class="qfn">'+esc(i<0?p:p.slice(i+1))+'</div>'+(i>0?'<div class="qfd">'+esc(p.slice(0,i))+'</div>':'')+'</div><span class="hint">'+(f.category?esc(f.category)+" · ":"")+humanSize(f.bytes)+'</span></div>'}).join("")||'<p class="hint" style="margin:0">Nothing here.</p>';

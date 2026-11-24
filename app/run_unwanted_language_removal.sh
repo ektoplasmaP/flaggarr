@@ -1,7 +1,7 @@
 #!/bin/sh
 # Run from the Run page, job "Delete unwanted subs". Argument: dry | apply | delete
-# Output goes to flaggarr/log/manual_unwanted_language_removal.log - open it in
-# File Station's text editor to see what happened.
+# Output goes to flaggarr/log/manual_unwanted_language_removal.log, and the Log
+# page in the web interface shows the same thing.
 export LC_ALL=en_US.UTF-8
 PATH="/usr/local/bin:/opt/bin:$PATH"; export PATH
 

@@ -56,7 +56,7 @@ TEXT_CODECS = ("subrip", "srt", "mov_text")
 
 TRACK_TYPES = ("pgs", "vobsub", "ass")
 
-# SUB_PGS / SUB_VOBSUB / SUB_ASS come from the settings (Subtitles -> Subtitle
+# SUB_PGS / SUB_VOBSUB / SUB_ASS come from the settings (Tracks -> Subtitle
 # types). Missing means "never", so a run without the environment behaves the
 # way this script always did.
 COUNTED_TYPES = tuple(
@@ -188,7 +188,7 @@ def internal_sub_langs(video, mkvmerge, ffprobe):
             out = subprocess.check_output(
                 [mkvmerge, "--command-line-charset", "UTF-8",
                  "--output-charset", "UTF-8", "-J", video],
-                stderr=subprocess.DEVNULL)
+                stderr=subprocess.DEVNULL, timeout=120)      # a damaged file can hang it
             data = json.loads(out.decode("utf-8", "replace"))
         except Exception:
             return None
@@ -228,7 +228,7 @@ def internal_sub_langs(video, mkvmerge, ffprobe):
     return None
 
 
-def collect_files(root, categories, mkvmerge, ffprobe):
+def collect_files(root, categories, mkvmerge, ffprobe, unreadable=None):
     """Walks the tree and returns a list of (category, file_path, detail)."""
     findings = []
     cache = {}
@@ -266,6 +266,8 @@ def collect_files(root, categories, mkvmerge, ffprobe):
                 continue
             internal = internal_sub_langs(video, mkvmerge, ffprobe)
             if internal is None:
+                if unreadable is not None:
+                    unreadable.append(video)   # never a move, but never silent either
                 continue
             if lang in internal:
                 findings.append(("redundant", file_path,
@@ -320,7 +322,16 @@ def main():
     print("Categories: %s" % ", ".join(categories))
     print()
 
-    findings = collect_files(args.root, categories, mkvmerge, ffprobe)
+    unreadable = []
+    findings = collect_files(args.root, categories, mkvmerge, ffprobe, unreadable)
+    if unreadable:
+        # "Found 3 files" on its own reads as "the rest are clean", which is not what
+        # happened: these could not be read, so nothing was decided about them.
+        print("%d video files could not be read, so their subtitles were left alone:" % len(unreadable))
+        for v in unreadable[:20]:
+            print("  %s" % v)
+        if len(unreadable) > 20:
+            print("  ... and %d more" % (len(unreadable) - 20))
     if args.limit:
         findings = findings[:args.limit]
 
@@ -349,7 +360,12 @@ def main():
     os.makedirs(args.quarantine, exist_ok=True)
 
     moved = failed = 0
-    with open(manifest_path, "a", encoding="utf-8") as mf:
+    # Line-buffered, and the row is written before the move: the manifest is the only
+    # way back out of quarantine, and a job stopped from the Run page or a container
+    # that dies must not leave files there with no record of where they came from. A
+    # row whose move then failed is harmless - restore_quarantine() sees the file is
+    # not there and drops the row.
+    with open(manifest_path, "a", encoding="utf-8", buffering=1) as mf:
         for category, file_path, detail in findings:
             rel = os.path.relpath(file_path, args.root)
             dest = os.path.join(args.quarantine, rel)
@@ -359,8 +375,8 @@ def main():
                     mf.write("%s\t%s\tDELETED\n" % (category, file_path))
                 else:
                     os.makedirs(os.path.dirname(dest), exist_ok=True)
-                    shutil.move(file_path, dest)
                     mf.write("%s\t%s\t%s\n" % (category, file_path, dest))
+                    shutil.move(file_path, dest)
                 moved += 1
             except Exception as exc:
                 print("  FAILED: %s (%s)" % (file_path, exc))
@@ -371,7 +387,9 @@ def main():
     else:
         print("Moved %d files to %s" % (moved, args.quarantine))
     if failed:
-        print("%d failed - see the lines above." % failed)
+        # ERROR: so the Run page reads this as a failure; "Moved 0 files" on its own
+        # looks like "nothing to do".
+        print("ERROR: %d files could not be moved - see the lines above." % failed)
     print("Manifest (category, from, to): %s" % manifest_path)
     print()
     print("Then run a library scan in Plex so the tracks disappear from the interface.")
