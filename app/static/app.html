@@ -71,7 +71,11 @@ h1{font-size:1.45rem;margin:0 0 .15em}
 .srh{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.srh svg{color:var(--mut);flex:none}
 .srt{color:var(--mut);font-size:.8rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-left:auto;white-space:nowrap}
 .srtitle{margin-top:6px;font-weight:600;overflow-wrap:anywhere}.srsub{color:var(--mut);font-size:.8rem;margin-top:2px;overflow-wrap:anywhere}
-.scard .bar{grid-template-columns:minmax(110px,auto) 1fr 40px}
+.scard .bar{grid-template-columns:minmax(110px,auto) 1fr 40px}.scard .bar i{background:color-mix(in srgb,var(--mut) 40%,transparent)}.scard .bar.top i{background:var(--acc)}
+/* Statistics, unslopped: one accent per chart (today's column, the largest bar), neutral for the rest; badges only for a state that needs a look */
+.srm{color:var(--mut);font-size:.8rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.sstats b.sdt{font-size:1rem;font-weight:500;line-height:1.38}
+.scard{padding:16px}.schead{flex-wrap:nowrap;gap:8px}.schead b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.schead .dotbadge{background:none;padding:0}
+@media(max-width:640px){.schead{flex-wrap:wrap}.sstats b.sdt{font-size:.9rem;line-height:1.5}}@media(max-width:380px){.sstats b.sdt{font-size:.8rem;line-height:1.7}}
 @media(max-width:640px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}.kpis.three{grid-template-columns:repeat(3,minmax(0,1fr))}.smeta{flex-basis:100%;margin-left:0}.kpis b{font-size:1.4rem}.sstats b{font-size:1.05rem}}.iconbtn svg{display:block}
 .iconbtn.spin svg{animation:spin .8s linear infinite}.iconbtn.spin{pointer-events:none}   /* Refresh: the arrow turns until the numbers are back */
 @media(prefers-reduced-motion:reduce){.iconbtn.spin svg{animation-duration:2.4s}}.sub{color:var(--mut);margin:0 0 1.5rem;font-size:.9rem}
@@ -477,7 +481,7 @@ details{margin-top:8px}summary{cursor:pointer;color:var(--mut);font-size:.85rem}
 .cards div,.cards a{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:14px 16px;color:inherit;text-decoration:none;display:block}
 .cards a:hover{border-color:var(--acc)}.cards a b{color:var(--fg)}
 .colbars{display:flex;align-items:flex-end;gap:3px;height:120px;padding:8px 0 0}
-.colbars div{flex:1;background:var(--acc);border-radius:3px 3px 0 0;min-height:2px;opacity:.85;position:relative;transform-origin:bottom}
+.colbars div{flex:1;background:color-mix(in srgb,var(--mut) 40%,transparent);border-radius:3px 3px 0 0;min-height:2px;position:relative;transform-origin:bottom}
 .colbars.animate div{animation:growY .7s cubic-bezier(.16,.7,.3,1) backwards;animation-delay:calc(var(--i,0)*30ms - var(--el,0ms))}
 @keyframes growY{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 @keyframes growX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
@@ -489,7 +493,7 @@ nav a.issue::after{content:"";width:8px;height:8px;flex:none;margin-left:auto;bo
 nav a.running::after{content:"";width:14px;height:14px;flex:none;margin-left:auto;box-sizing:border-box;border-radius:50%;border:2px solid color-mix(in srgb,var(--acc) 28%,transparent);border-top-color:var(--acc);animation:spin .7s linear infinite}
 @media(prefers-reduced-motion:reduce){nav a.running::after{animation-duration:2.6s}nav #mediaGroup .submenu,nav #mediaGroup.collapsed .submenu{transition:none}}
 @media(prefers-reduced-motion:reduce){.colbars.animate div,.bars.animate .bar i{animation:none}.spinner,nav a.running::after{animation:none}}
-.colbars div.empty{background:var(--rule)}.colbars div:hover{opacity:1}
+.colbars div:hover{background:color-mix(in srgb,var(--mut) 65%,transparent)}.colbars div:last-child{background:var(--acc)}.colbars div.empty{background:var(--rule)}
 .colbars div.error{background:var(--error)}
 .axis{display:flex;justify-content:space-between;color:var(--mut);font-size:.75rem;margin-top:4px;font-variant-numeric:tabular-nums}
 .bar{display:grid;grid-template-columns:130px 1fr 40px;gap:10px;align-items:center;padding:6px 0;font-size:.9rem}
@@ -1243,17 +1247,17 @@ function kpi(rows){return '<div class="kpis'+(rows.length===3?' three':'')+'">'+
 function sby(id){const v=(stats.started||{})[id]; return v==='scheduled'?['Scheduled','ok']:v==='manual'?['Manual','plain']:null}   // who started the last run: the weekly scheduler, or the Run page
 function scard(title,badge,prog,rows,foot,help){return '<div class="scard"><div class="schead"><b>'+title+'</b>'+(help?qm(help):'')+(badge?'<span class="dotbadge '+badge[1]+'">'+badge[0]+'</span>':'')+'</div>'
  +(prog?'<div class="sprog"><span>'+prog[0]+'</span><span class="sn"><b>'+prog[1]+'</b> / '+prog[2]+'</span></div><div class="sbar"><i class="'+(prog[3]||'')+'" style="width:'+(prog[2]?Math.min(100,Math.round(prog[1]/prog[2]*100)):0)+'%"></i></div>':'')
- +'<div class="sstats">'+rows.map(([v,l,h])=>{if(h)QTXT.push(h); return '<div'+(h?' class="qk" data-q="'+(QTXT.length-1)+'" tabindex="0"':'')+'><b>'+v+'</b><span>'+l+'</span></div>'}).join('')+'</div>'+(foot?'<div class="sfoot">'+foot+'</div>':'')+'</div>'}
+ +'<div class="sstats">'+rows.map(([v,l,h])=>{if(h)QTXT.push(h); return '<div'+(h?' class="qk" data-q="'+(QTXT.length-1)+'" tabindex="0"':'')+'><b'+(/^\d\d-\d\d \d\d:\d\d/.test(String(v))?' class="sdt"':'')+'>'+v+'</b><span>'+l+'</span></div>'}).join('')+'</div>'+(foot?'<div class="sfoot">'+foot+'</div>':'')+'</div>'}
 const SICON={movie:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M17 9h4M3 15h4M17 15h4"/></svg>',
  episode:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 21h8M12 18v3"/></svg>',
  folder:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>'};
-function srow(pills,ts,title,sub,icon){return '<div class="srow"><div class="srh">'+(icon||'')+pills.filter(p=>p[0]).map(([t,c])=>'<span class="dotbadge '+(c||'')+'">'+esc(String(t))+'</span>').join('')+'<span class="srt">'+esc(ts||'')+'</span></div><div class="srtitle">'+esc(title)+'</div>'+(sub?'<div class="srsub">'+esc(sub)+'</div>':'')+'</div>'}
-function sbars(rows){const mx=Math.max(1,...rows.map(r=>r[1])); return '<div class="bars">'+rows.map(([l,n],i)=>'<div class="bar"><span>'+esc(String(l))+'</span><i style="--i:'+i+';width:'+Math.round(n/mx*100)+'%"></i><em>'+n+'</em></div>').join('')+'</div>'}
+function srow(pills,ts,title,sub,icon,meta){return '<div class="srow"><div class="srh">'+(icon||'')+pills.filter(p=>p[0]).map(([t,c])=>'<span class="dotbadge '+(c||'')+'">'+esc(String(t))+'</span>').join('')+(meta?'<span class="srm">'+esc(meta)+'</span>':'')+'<span class="srt">'+esc(ts||'')+'</span></div><div class="srtitle">'+esc(title)+'</div>'+(sub?'<div class="srsub">'+esc(sub)+'</div>':'')+'</div>'}
+function sbars(rows){const mx=Math.max(1,...rows.map(r=>r[1])), top=rows.findIndex(r=>r[1]===mx); return '<div class="bars">'+rows.map(([l,n],i)=>'<div class="bar'+(i===top?' top':'')+'"><span>'+esc(String(l))+'</span><i style="--i:'+i+';width:'+Math.round(n/mx*100)+'%"></i><em>'+n+'</em></div>').join('')+'</div>'}
 function statsList(){const rec=stats.recent||[], q=statsQ.trim().toLowerCase();
  let rows=rec.filter(r=>!q||(r.title+' '+(r.file||'')+' '+(r.lang||'')).toLowerCase().includes(q));
  if(statsSort==='old')rows=rows.slice().reverse(); else if(statsSort==='title')rows=rows.slice().sort((x,y)=>x.title.localeCompare(y.title));
  const shown=statsMore||q?rows:rows.slice(0,25);   // the newest 25, the rest behind Show all - a search always shows every match
- const body=shown.map(r=>srow([[r.ok?'OK':r.skip?'Skipped':'Error',r.ok?'ok':r.skip?'amb':'err'],[r.lang,'plain'],[r.kind==='episode'?'Sonarr':'Radarr',r.kind==='episode'?'son':'rad']],r.ts.slice(0,16),r.title,r.note||'',SICON[r.kind]||'')).join('');
+ const body=shown.map(r=>srow([[r.ok?'':r.skip?'Skipped':'Error',r.skip?'amb':'err']],r.ts.slice(0,16),r.title,r.note||'',SICON[r.kind]||'',[r.lang,r.kind==='episode'?'Sonarr':'Radarr'].filter(Boolean).join(' · '))).join('');
  return '<div class="slist">'+(body||'<div class="srow empty">'+(q?'No import matches that.':'No imports yet.')+'</div>')+(shown.length<rows.length?'<div class="srow more"><button type="button" class="btn-sm" data-statsmore>Show all '+rows.length+'</button></div>':'')+'</div><p class="logCount" style="margin:-6px 2px 0">'+shown.length+' of '+rec.length+' imports in the last 30 days</p>'}
 function statsImports(){const s=stats; const max=Math.max(1,...s.days.map(d=>d.ok+d.error)); const rec=s.recent||[];   // everything below is the last 30 days
  const cnt=(k,ok)=>rec.filter(x=>(!k||x.kind===k)&&(ok===undefined||(ok?x.ok:!x.ok&&!x.skip))).length, skipped=rec.filter(x=>x.skip).length, last=k=>{const r=rec.find(x=>x.kind===k); return r?r.ts.slice(5,16):'–'};
