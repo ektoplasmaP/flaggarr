@@ -22,7 +22,7 @@ import subprocess
 import threading
 from datetime import datetime
 
-VERSION = "0.86.11.1"          # shown in the footer. Bumped on every delivered change, whatever file.
+VERSION = "0.86.11.2"          # shown in the footer. Bumped on every delivered change, whatever file.
 
 # The program lives in the image (/app), everything this installation owns lives
 # in the mounted volume (/config): settings, logs, backups.
@@ -512,6 +512,11 @@ def note_direct_host(h):
 def signed_in(h):
     if not password_set():
         return False            # nothing is signed in until a password exists
+    if not _secret():
+        # No secret, so _sig() would sign with an empty key and any cookie could be
+        # forged offline. password_set() answers True over an unreadable settings.json
+        # on purpose, to keep the first-run form shut, and that must not become a way in.
+        return False
     if from_lan(h) and not read_settings().get("auth_lan", True):
         return True                         # the owner has exempted the home network
     for bit in (h.headers.get("Cookie") or "").split(";"):
@@ -656,6 +661,8 @@ def user_cookie(uid):
 
 def session_user(h):
     """The uid of a Plex-signed-in user session, else None. The owner uses signed_in()."""
+    if not _secret():
+        return None             # same as signed_in(): an empty key signs anything
     for bit in (h.headers.get("Cookie") or "").split(";"):
         k, _, v = bit.strip().partition("=")
         if k == COOKIE_NAME:
