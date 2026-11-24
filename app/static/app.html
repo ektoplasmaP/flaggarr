@@ -10,6 +10,11 @@
 :root[data-theme=dark]{--bg:#111713;--fg:#e6ece7;--mut:#8f9b93;--rule:#283329;--panel:#182119;--side:#0c130e;--sidefg:#9fb3a5;--sideact:#1c2c21;
       --acc:#6fbf7f;--acc2:#4c9a5c;--on:#5fb070;--error:#e0655a;--skip:#84908a;--ui:#7fa8d8;--code:#0f150f;--glow:rgba(111,191,127,.17)}
 *{box-sizing:border-box}body{min-height:100vh}
+/* Every native tick and dot carries the page's own green, not the browser's blue.
+   One rule rather than one per container: the four that used to repeat it left the
+   Restore dialog's radio and a modal checkbox blue. --acc is themed, so dark mode
+   follows without a second declaration. */
+input[type=checkbox],input[type=radio]{accent-color:var(--acc)}
 .step{display:flex;flex-wrap:wrap;gap:10px}.step a{flex:1;min-width:180px;display:flex;gap:10px;align-items:center;padding:12px 14px;border:1px solid var(--rule);border-radius:10px;color:inherit;text-decoration:none;background:var(--code)}
 .step a:hover{border-color:var(--acc)}.step .num{margin:0}.step b{display:block;font-size:.92rem}.step small{color:var(--mut);font-size:.78rem}.step a.off{opacity:.5}.step a.off .num{color:var(--mut)}
 input.wide{width:340px}
@@ -171,7 +176,7 @@ h2+.grp{margin-top:20px}                      /* same inset at the top as at the
 .otherRow{border-style:dashed}
 .otherRow b{color:var(--mut)}
 .listRow:not(:has(input:checked)){color:var(--mut)}.listRow.dragging{opacity:.4} .row:has(>.field.withnote){align-items:flex-start} .row:has(>.field.withnote)>.v{margin-top:7px}   /* a field with a note under it: the title stays level with the field, not with the middle of field + note */ .listRow.lift{position:relative;z-index:1;animation:lift var(--t-pop) ease-out} @keyframes lift{from{box-shadow:0 0 0 2px var(--acc)}to{box-shadow:0 0 0 2px transparent}}.listRow:active{cursor:grabbing}
-.listRow input{flex:none;width:16px;height:16px;accent-color:var(--acc);cursor:pointer;margin:0}
+.listRow input{flex:none;width:16px;height:16px;cursor:pointer;margin:0}
 .listRow b{font-weight:600}.listRow small{color:var(--mut);margin-left:6px}.listRow .handle{margin-left:auto;color:var(--mut);font-size:1.1rem;line-height:1;cursor:grab;touch-action:none;padding:0 3px}
 .listRow .handle:active{cursor:grabbing;color:var(--acc)} .listRow .mv{display:none} .onphone{display:none} .listRow .mv button{all:unset;box-sizing:border-box;width:32px;height:32px;margin:-6px 0;display:grid;place-items:center;color:var(--mut);cursor:pointer;border-radius:6px} .listRow .mv button:active{color:var(--acc)} .listRow .mv button:focus-visible{outline:2px solid var(--acc)} .listRow .mv svg{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .gsec{padding-top:16px}.gsec>h3:first-child,.gsec>.gchoice:first-child>h3:first-child{margin-top:7px}   /* the first heading sits just under the card edge, wrapped or not */
@@ -505,14 +510,14 @@ table.stat td.n{text-align:right;font-variant-numeric:tabular-nums}table.stat th
 .jobs .catsum small{color:var(--mut)}
 .jobs .catsum .rub{font-weight:700}
 .jobs .category label{display:flex;align-items:flex-start;gap:9px;cursor:pointer}
-.jobs .category input{margin:2px 0 0;accent-color:var(--acc)}
+.jobs .category input{margin:2px 0 0}
 .jobs .category b{display:block;font-weight:600;font-size:.9rem}
 .jobs .category small{display:block;color:var(--mut);font-size:.82rem}
 .jobs .category .warn{color:var(--error);font-size:.82rem}
-select.tagsel optgroup{color:var(--mut,#8a8f98);font-weight:600}select.tagsel option{color:var(--fg,inherit)}.usefrom{display:flex;gap:18px}.usefrom label{display:flex;align-items:center;gap:7px;cursor:pointer}.usefrom label:has(input:disabled){cursor:default}.usefrom input{margin:0;accent-color:var(--acc)}   /* Tag list: which arrs the tag is read from */
+select.tagsel optgroup{color:var(--mut,#8a8f98);font-weight:600}select.tagsel option{color:var(--fg,inherit)}.usefrom{display:flex;gap:18px}.usefrom label{display:flex;align-items:center;gap:7px;cursor:pointer}.usefrom label:has(input:disabled){cursor:default}.usefrom input{margin:0}   /* Tag list: which arrs the tag is read from */
 .chklist{display:flex;flex-direction:column;gap:6px;margin-top:6px;padding-left:18px;max-width:620px}
 .chklist label{display:flex;align-items:flex-start;gap:9px;cursor:pointer}
-.chklist input{margin:2px 0 0;accent-color:var(--acc)}
+.chklist input{margin:2px 0 0}
 .chklist b{display:block;font-weight:600;font-size:.9rem}
 .chklist small{display:block;color:var(--mut);font-size:.82rem}
 .last_run .rc{font-weight:600}.last_run .rc.ok{color:var(--on)}.last_run .rc.error{color:var(--error)}
