@@ -53,7 +53,7 @@ PORT = 8899
 # The program lives in the image (/app); this installation's own files live in
 # the mounted volume (/config).
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_DIR = "/config"
+CONFIG_DIR = os.environ.get("FLAGGARR_CONFIG_DIR", "/config")   # same override as ui.py, so it can be booted outside the container
 SETDEFAULTS = APP_DIR + "/auto_set_mkv_defaultflags.sh"
 PLEXPICK = APP_DIR + "/auto_set_plex_defaults.py"
 LOG_DIR = CONFIG_DIR + "/log"

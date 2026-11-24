@@ -22,7 +22,7 @@ import subprocess
 import threading
 from datetime import datetime
 
-VERSION = "0.86.11"          # shown in the footer. Bumped on every delivered change, whatever file.
+VERSION = "0.86.11.1"          # shown in the footer. Bumped on every delivered change, whatever file.
 
 # The program lives in the image (/app), everything this installation owns lives
 # in the mounted volume (/config): settings, logs, backups.
@@ -847,7 +847,7 @@ def test_connection(service, url=None, key_name=None):
             req = urllib.request.Request(url + "/api/v3/system/status", headers={"X-Api-Key": key_name, "Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=6) as r:
             body = r.read().decode("utf-8", "replace")
-            ctype = (r.headers.get("Content-Type") or "?").split(";")[0].strip()
+            ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip() or "no content type"
         # Something answered, but not the program we asked for. Nearly always the port: an address
         # without one lands on whatever serves port 80. Say that, rather than the parser's own
         # exception name - "ParseError" tells nobody which door was knocked on.
