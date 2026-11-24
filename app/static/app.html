@@ -15,6 +15,9 @@
    Restore dialog's radio and a modal checkbox blue. --acc is themed, so dark mode
    follows without a second declaration. */
 input[type=checkbox],input[type=radio]{accent-color:var(--acc)}
+/* The same ring the row buttons use. Offset, because flush against a 16px box it
+   is hard to see which control has the keyboard. */
+input[type=checkbox]:focus-visible,input[type=radio]:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .step{display:flex;flex-wrap:wrap;gap:10px}.step a{flex:1;min-width:180px;display:flex;gap:10px;align-items:center;padding:12px 14px;border:1px solid var(--rule);border-radius:10px;color:inherit;text-decoration:none;background:var(--code)}
 .step a:hover{border-color:var(--acc)}.step .num{margin:0}.step b{display:block;font-size:.92rem}.step small{color:var(--mut);font-size:.78rem}.step a.off{opacity:.5}.step a.off .num{color:var(--mut)}
 input.wide{width:340px}
