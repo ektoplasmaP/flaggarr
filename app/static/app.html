@@ -257,7 +257,8 @@ h2+.grp{margin-top:20px}                      /* same inset at the top as at the
 .listRow .selcue{color:var(--mut);font-size:.78rem;margin-left:10px;white-space:nowrap}
 .listRow .selcue+select.mode{margin-left:5px}
 .listRow .selcue .cuelab{font-weight:400;margin-left:5px}
-.ruleList.mapList .listRow.otherRow select.mode{width:11rem}
+.ruleList.mapList .listRow.otherRow select.mode{width:11rem;flex:none}   /* flex:none, because the row below is a column: the shared rule's flex-basis
+   would be read as a height there and stretch this one select to 11rem tall */
 .ruleList.mapList .listRow.otherRow{display:flex;flex-direction:column;align-items:flex-start;gap:10px}   /* the question on its own line, the choice under it: never a wrapped caption */
 .ruleList.mapList .listRow.otherRow .selcue{display:none}   /* its two values are sentences, not language names */
 .ruleList.subList:not(.mapList) .listRow select.mode{width:11rem}   /* so are the subtitle rows' */
