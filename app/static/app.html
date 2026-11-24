@@ -1123,7 +1123,7 @@ function ruleValue(el){const rows=[...el.querySelectorAll('.listRow[data-v]')].f
  if(el.classList.contains('subnever'))return NEVER+':none';                 // never any subtitle: the rows say nothing
  if(el.classList.contains('subalways')){const sc=el.closest('.ubody')||el.closest('section[data-uid]')||document.querySelector('#main'); const h=heardCodes(el.dataset.rule||el.dataset.urule||'sub_rules',sc); if(h.length)return h.map(c=>c+':same').join(' ')}   // always: every language heard, subtitled in itself
  return (el.classList.contains('plexoff')?[PLEX+':none']:[]).concat(el.classList.contains('subfollow')?[FOLLOW+':none']:[],rows).join(' ')}
-const TRACK_TYPES=[['sdh','SDH / hearing-impaired','Tracks flagged hearing-impaired or named SDH.'],['forced','Forced','Tracks flagged forced. They only cover lines in another language and signs, not the whole dialogue.'],['pgs','Image: PGS','Blu-ray picture subtitles. Often make Plex transcode the video, which requires heavy processing power.'],['vobsub','Image: VobSub','DVD picture subtitles. Same limits as PGS.'],['ass','Styled text: ASS/SSA','Subtitles with fonts and positioning, common in anime; often signs and karaoke rather than dialogue.']];
+const TRACK_TYPES=[['sdh','SDH / hearing-impaired','Tracks flagged hearing-impaired or named SDH.'],['pgs','Image: PGS','Blu-ray picture subtitles. Often make Plex transcode the video, which requires heavy processing power.'],['vobsub','Image: VobSub','DVD picture subtitles. Same limits as PGS.'],['ass','Styled text: ASS/SSA','Subtitles with fonts and positioning, common in anime; often signs and karaoke rather than dialogue.'],['forced','Forced','Tracks flagged forced. They only cover lines in another language and signs, not the whole dialogue, so on the same side of Plain text a full subtitle always beats them.']];   // forced last: on the same side of Plain text a full track wins (track_rules.pick_subtitle)
 function trackRow(v,name,desc,on){return '<div class="listRow" draggable="true" data-v="'+v+'"><input type="checkbox" '+(on?'checked':'')+'><span class="n"></span><b>'+name+qm(desc)+'</b>'+handleHtml()+'</div>'}
 function trackList(){const t=Object.fromEntries(TRACK_TYPES.map(r=>[r[0],r]));
  const chosen=(st.settings.sub_track_order||'text').split(' ').filter(Boolean).flatMap(v=>v==='bitmap'?['pgs','vobsub','ass']:[v]);
@@ -1131,7 +1131,8 @@ function trackList(){const t=Object.fromEntries(TRACK_TYPES.map(r=>[r[0],r]));
  const savedDisp=(st.settings.sub_track_display_order||'').split(' ').filter(Boolean).filter(v=>v==='text'||all.includes(v));
  const base=savedDisp.length?savedDisp:chosen.concat(all.filter(v=>!chosen.includes(v)));
  const seen={}, disp=base.filter(v=>seen[v]?false:(seen[v]=1));
- const shown=(disp.includes('text')?disp:['text'].concat(disp)).concat(all.filter(v=>!disp.includes(v)));
+ const full=(disp.includes('text')?disp:['text'].concat(disp)).concat(all.filter(v=>!disp.includes(v))), cut=full.indexOf('text'), byType=(x,y)=>all.indexOf(x)-all.indexOf(y);
+ const shown=full.slice(0,cut).sort(byType).concat(['text'],full.slice(cut+1).sort(byType));   // shown in the order they are weighed inside each zone, whatever an older save holds
  const rows=shown.map(v=>v==='text'?'<div class="listRow textRow" data-v="text"><input type="checkbox" checked disabled><span class="n"></span><b>Plain text</b><small>Always allowed. You get the types above it first, the types below only as a last resort.</small>'+handleHtml()+'</div>':trackRow(v,t[v][1],t[v][2],chosen.includes(v)));
  return '<div class="prio trackList" data-k="sub_track_order" data-full="sub_track_display_order">'+rows.join('')+'</div>'+(st&&st.me?'':'<div class="bzNote">'+bazarrNote()+'</div>')}   // admin info - guests never see it
 function bazarrNote(){const bz=st.bazarr_image_subs||{}, nmn={ignore_pgs_subs:'PGS',ignore_vobsub_subs:'VobSub',ignore_ass_subs:'ASS'};
@@ -1632,7 +1633,7 @@ function userCard(u){
    const uk=x=>x.split('data-k=').join('data-uk=').split('data-rule=').join('data-urule=').replace(/<button[^>]*data-dflt[^>]*>Default<\/button>/g,'').replace(/<div class="ruleTop"><\/div>/g,'');
    parts=[uk(audioList('audio_priority',false)),
     uk(subList('sub_rules',false)+grp('sub_rules','fallback','Subtitle language for foreign content',langList('sub_langs','','',1))),
-    '<p class="hint"><span class="ondesk">Drag the handles to prioritize them.</span><span class="onphone">Use the buttons to prioritize them.</span></p>'+uk(trackList()),
+    '<p class="hint"><span class="ondesk">Drag a type above Plain text to prefer it, or leave it below to use it only when nothing else fits.</span><span class="onphone">Move a type above Plain text to prefer it, or leave it below to use it only when nothing else fits.</span></p>'+uk(trackList()),
     '<p class="hint">Does your TV, soundbar or receiver lack support for a format? Set it to Avoid, and a title only uses it when there is nothing else in your language.</p>'+uk(codecList())];
   }
   st.settings=saved;
@@ -1954,8 +1955,8 @@ const PAGES={
 ,
  about:()=>'<h1>About</h1><p class="sub">flaggarr v'+st.version+'</p>'
    +'<section><h2>flaggarr</h2><table class="stat">'
-   +'<tr><td>Version</td><td>'+st.version+'</td></tr>'
-   +'<tr><td>Container</td><td><code>flaggarr</code>, port 8899</td></tr>'
+   +'<tr><td>Version</td><td>'+st.version+(st.built&&!isNaN(new Date(st.built))?' <span style="color:var(--mut);font-size:.85rem">· published '+new Date(st.built).toLocaleString('sv-SE',{dateStyle:'short',timeStyle:'short'})+'</span>':' <span style="color:var(--mut);font-size:.85rem">· built locally</span>')+'</td></tr>'
+   +'<tr><td>Container</td><td><code>flaggarr</code>, port 8899: '+(st.built?'image <code>ghcr.io/ektoplasmap/flaggarr</code>':'built from the project folder')+'</td></tr>'
    +'<tr><td>Address</td><td><a href="'+esc(location.origin)+'">'+esc(location.origin)+'</a> <span style="color:var(--mut);font-size:.85rem">(the address you are on right now)</span></td></tr>'
    +'<tr><td>Uptime</td><td>'+(()=>{const a=new Date(String(st.up_since||"").replace(" ","T")),b=new Date(String(st.now||"").replace(" ","T")),m=Math.round((b-a)/60000);return isFinite(m)&&m>=0?(m<60?m+" min":m<2880?Math.round(m/60)+" h":Math.round(m/1440)+" days"):"–";})()+' <span style="color:var(--mut);font-size:.85rem">(up since '+st.up_since+')</span></td></tr>'
    +'<tr><td>Listener time</td><td>'+st.now+' <span style="color:var(--mut);font-size:.85rem">(the clock inside the container; log timestamps and the weekly check follow it)</span></td></tr>'

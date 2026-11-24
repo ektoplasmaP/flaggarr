@@ -22,7 +22,7 @@ import subprocess
 import threading
 from datetime import datetime
 
-VERSION = "0.86.11.5"          # shown in the footer. Bumped on every delivered change, whatever file.
+VERSION = "0.86.12"          # shown in the footer. Bumped on every delivered change, whatever file.
 
 # The program lives in the image (/app), everything this installation owns lives
 # in the mounted volume (/config): settings, logs, backups.
@@ -2569,6 +2569,7 @@ def status(listener_log, start_time):
         "log_bytes": log_size(),
         "now": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "version": VERSION,
+        "built": os.environ.get("FLAGGARR_BUILT", ""),   # set by the published image, empty on a local build
         "media_root_ok": os.path.isdir(MEDIA_ROOT_()),
         "media_mounts": mounted_media(),
         "roots_state": roots_state(),
